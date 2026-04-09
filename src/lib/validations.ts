@@ -23,7 +23,7 @@ export const createUserSchema = z.object({
   email: z.string().email().toLowerCase().trim(),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   role: z.enum(['ADMIN', 'PHARMACY']).default('PHARMACY'),
-  pharmacyName: z.string().min(2).max(100).trim().optional(),
+  pharmacyName: z.string().min(1, 'El nombre de sucursal es requerido').max(100).trim().optional(),
   pharmacyCode: z
     .string()
     .regex(/^FAR-\d{3}$/, 'El código debe tener formato FAR-001')

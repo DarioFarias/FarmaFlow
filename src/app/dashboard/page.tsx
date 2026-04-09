@@ -3,10 +3,25 @@ import { authOptions } from '@/lib/auth'
 import { UserRole } from '@/types'
 import { Package, Receipt, Users, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
+import connectDB from '@/lib/mongodb'
+import User from '@/models/User'
+// import SupplyRequest from '@/models/SupplyRequest'
+// import Expense from '@/models/Expense'
+
+export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
   const isAdmin = session?.user.role === UserRole.ADMIN
+
+  await connectDB()
+
+  // Conteo real si es Admin
+  const farmaciasCount = isAdmin ? await User.countDocuments({ role: UserRole.PHARMACY, isActive: true }) : 0
+  
+  // Próximamente traeremos esto de la DB
+  const activeSupplyCount = 0
+  const pendingExpenseCount = 0
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -27,11 +42,11 @@ export default async function DashboardPage() {
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {[
-          { label: 'Pedidos activos', value: '12', icon: Package, color: 'text-blue-600',   bg: 'bg-blue-50', ring: 'ring-blue-100' },
-          { label: 'Gastos pendientes', value: '4', icon: Receipt, color: 'text-orange-600', bg: 'bg-orange-50', ring: 'ring-orange-100' },
+          { label: 'Pedidos activos', value: activeSupplyCount.toString(), icon: Package, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-100' },
+          { label: 'Gastos pendientes', value: pendingExpenseCount.toString(), icon: Receipt, color: 'text-orange-600', bg: 'bg-orange-50', ring: 'ring-orange-100' },
           ...(isAdmin
             ? [
-                { label: 'Farmacias activas', value: '20', icon: Users, color: 'text-brand-600', bg: 'bg-brand-50', ring: 'ring-brand-100' },
+                { label: 'Farmacias activas', value: farmaciasCount.toString(), icon: Users, color: 'text-brand-600', bg: 'bg-brand-50', ring: 'ring-brand-100' },
                 { label: 'Crecimiento', value: '+14%', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'ring-emerald-100' },
               ]
             : []),

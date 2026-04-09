@@ -3,115 +3,87 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import SupplyRequest from '@/models/SupplyRequest'
-import User from '@/models/User'
 import { createSupplyRequestSchema } from '@/lib/validations'
-import { UserRole, ApiResponse, SupplyRequestStatus } from '@/types'
+import { UserRole, SupplyRequestStatus } from '@/types'
 
 // =============================================
-// GET /api/supplies
-// ADMIN: lista todos los pedidos
-// PHARMACY: lista sólo sus propios pedidos
+// API Route: /api/supplies
+// Maneja la creación y listado de suministros
 // =============================================
-export async function GET(req: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'No autorizado' }, { status: 401 })
-    }
 
-    await connectDB()
-
-    const { searchParams } = new URL(req.url)
-    const status = searchParams.get('status')
-    const page = parseInt(searchParams.get('page') ?? '1')
-    const limit = parseInt(searchParams.get('limit') ?? '20')
-    const skip = (page - 1) * limit
-
-    // Filtro base según rol
-    const filter: Record<string, unknown> = {}
-
-    if (session.user.role === UserRole.PHARMACY) {
-      filter.pharmacy = session.user.id
-    }
-
-    if (status && Object.values(SupplyRequestStatus).includes(status as SupplyRequestStatus)) {
-      filter.status = status
-    }
-
-    const [requests, total] = await Promise.all([
-      SupplyRequest.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      SupplyRequest.countDocuments(filter),
-    ])
-
-    return NextResponse.json({
-      success: true,
-      data: requests,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    })
-  } catch (error) {
-    console.error('[GET /api/supplies]', error)
-    return NextResponse.json<ApiResponse>({ success: false, error: 'Error interno del servidor' }, { status: 500 })
-  }
-}
-
-// =============================================
-// POST /api/supplies
-// Solo PHARMACY puede crear pedidos
-// =============================================
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'No autorizado' }, { status: 401 })
-    }
-
-    if (session.user.role !== UserRole.PHARMACY) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'Solo las farmacias pueden crear pedidos' }, { status: 403 })
+    
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     const body = await req.json()
     const validation = createSupplyRequestSchema.safeParse(body)
 
     if (!validation.success) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: validation.error.errors[0]?.message },
+      return NextResponse.json(
+        { error: 'Datos del pedido inválidos', details: validation.error.format() },
         { status: 400 }
       )
     }
 
     await connectDB()
 
-    // Obtener datos actualizados de la farmacia
-    const pharmacyUser = await User.findById(session.user.id).lean()
-    if (!pharmacyUser) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'Farmacia no encontrada' }, { status: 404 })
-    }
+    // El nombre de la farmacia viene de la sesión para evitar fraudes
+    const pharmacyName = session.user.pharmacyName || session.user.name
 
-    const request = await SupplyRequest.create({
+    const newRequest = await SupplyRequest.create({
       ...validation.data,
       pharmacy: session.user.id,
-      pharmacyName: pharmacyUser.pharmacyName ?? pharmacyUser.name,
+      pharmacyName: pharmacyName,
       status: SupplyRequestStatus.REQUESTED,
       statusHistory: [
         {
           status: SupplyRequestStatus.REQUESTED,
-          changedBy: session.user.id,
-          changedAt: new Date(),
-          comment: 'Pedido creado por la farmacia',
+          changedBy: session.user.name,
+          comment: 'Pedido inicial creado por la sucursal',
         },
       ],
     })
 
-    return NextResponse.json<ApiResponse>({ success: true, data: request }, { status: 201 })
+    return NextResponse.json(newRequest, { status: 201 })
   } catch (error) {
-    console.error('[POST /api/supplies]', error)
-    return NextResponse.json<ApiResponse>({ success: false, error: 'Error interno del servidor' }, { status: 500 })
+    console.error('API_SUPPLIES_POST_ERROR:', error)
+    return NextResponse.json(
+      { error: 'Error al procesar el pedido de suministros' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    await connectDB()
+
+    let query = {}
+    
+    // Si es FARMACIA, solo ve sus propios pedidos
+    if (session.user.role === UserRole.PHARMACY) {
+      query = { pharmacy: session.user.id }
+    }
+    // Si es ADMIN, ve todos (o puede filtrar por farmacia si luego lo agregamos)
+
+    const requests = await SupplyRequest.find(query)
+      .sort({ createdAt: -1 })
+      .limit(50)
+
+    return NextResponse.json(requests)
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Error al obtener los suministros' },
+      { status: 500 }
+    )
   }
 }
