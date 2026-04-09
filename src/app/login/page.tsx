@@ -1,57 +1,44 @@
 import type { Metadata } from 'next'
+import { LoginForm } from './LoginForm'
 
-export const metadata: Metadata = { title: 'Iniciar sesión' }
+export const metadata: Metadata = { 
+  title: 'Iniciar sesión',
+  description: 'Accede al panel de control de FarmaFlow'
+}
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm mb-4">
-            <span className="text-3xl">💊</span>
+    <div className="min-h-screen bg-gradient-to-br from-brand-600 via-brand-700 to-indigo-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Logo Section */}
+        <div className="text-center mb-10 animate-fade-in">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl mb-6 transform transition-transform hover:rotate-12">
+            <span className="text-4xl filter drop-shadow-md">💊</span>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">FarmaFlow</h1>
-          <p className="text-brand-100 mt-1 text-sm">Gestión centralizada de farmacias</p>
+          <h1 className="text-4xl font-extrabold text-white tracking-tight drop-shadow-sm">
+            FarmaFlow
+          </h1>
+          <div className="h-1 w-12 bg-emerald-400 mx-auto mt-2 rounded-full"></div>
+          <p className="text-brand-100 mt-4 text-sm font-medium opacity-90">
+            Sistema de Gestión Farmacéutica Integral
+          </p>
         </div>
 
-        {/* Card form */}
-        <div className="card shadow-xl">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Iniciar sesión</h2>
-          <form action="/api/auth/callback/credentials" method="POST" className="space-y-4">
-            <div>
-              <label htmlFor="email" className="label">Email</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                placeholder="tu@farmacia.com"
-                className="input"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="label">Contraseña</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                placeholder="••••••••"
-                className="input"
-              />
-            </div>
-            <button type="submit" className="btn-primary w-full mt-2">
-              Entrar
-            </button>
-          </form>
-        </div>
+        {/* Client Side Login Form */}
+        <LoginForm />
 
-        <p className="text-center text-brand-100 text-xs mt-6">
-          ¿Problemas para ingresar? Contacta al supervisor.
-        </p>
+        {/* Footer Support */}
+        <div className="text-center mt-8">
+          <p className="text-white/60 text-sm">
+            ¿Olvidaste tu contraseña o tienes problemas?
+          </p>
+          <a 
+            href="mailto:soporte@farmaflow.com" 
+            className="text-emerald-300 hover:text-emerald-200 text-sm font-semibold underline underline-offset-4 decoration-emerald-500/30 transition-colors"
+          >
+            Contactar al Soporte Técnico
+          </a>
+        </div>
       </div>
     </div>
   )
