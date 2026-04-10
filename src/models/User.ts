@@ -61,6 +61,14 @@ const UserSchema = new Schema<IUserDocument>(
       type: Boolean,
       default: true,
     },
+    profileImage: {
+      type: String,
+      trim: true,
+    },
+    profileImagePublicId: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true, // Auto-gestiona createdAt y updatedAt

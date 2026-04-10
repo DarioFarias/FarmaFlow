@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import { UserRole } from '@/types'
+import { isAdmin as checkIsAdmin, isPharmacy as checkIsPharmacy } from './roles'
 
 // =============================================
 // FARMAFLOW - Configuración de NextAuth.js
@@ -59,6 +60,7 @@ export const authOptions: NextAuthOptions = {
           role: user.role,
           pharmacyName: user.pharmacyName,
           pharmacyCode: user.pharmacyCode,
+          profileImage: user.profileImage,
         }
       },
     }),
@@ -69,8 +71,9 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = (user as { role: UserRole }).role
-        token.pharmacyName = (user as { pharmacyName?: string }).pharmacyName
-        token.pharmacyCode = (user as { pharmacyCode?: string }).pharmacyCode
+        token.pharmacyName = (user as any).pharmacyName
+        token.pharmacyCode = (user as any).pharmacyCode
+        token.profileImage = (user as any).profileImage
       }
       return token
     },
@@ -81,6 +84,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as UserRole
         session.user.pharmacyName = token.pharmacyName as string | undefined
         session.user.pharmacyCode = token.pharmacyCode as string | undefined
+        session.user.profileImage = token.profileImage as string | undefined
       }
       return session
     },
@@ -89,9 +93,9 @@ export const authOptions: NextAuthOptions = {
 
 // ---- Helpers de autorización ----
 export function isAdmin(role?: UserRole): boolean {
-  return role === UserRole.ADMIN
+  return checkIsAdmin(role)
 }
 
 export function isPharmacy(role?: UserRole): boolean {
-  return role === UserRole.PHARMACY
+  return checkIsPharmacy(role)
 }

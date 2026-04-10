@@ -11,6 +11,7 @@ interface DashboardShellProps {
     name?: string | null
     role: UserRole
     pharmacyName?: string
+    profileImage?: string
   }
 }
 
@@ -24,11 +25,13 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
         pharmacyName={user.pharmacyName} 
         isOpen={isSidebarOpen} 
         setIsOpen={setIsSidebarOpen} 
+        profileImage={user.profileImage}
       />
       
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header 
           userName={user.name || undefined} 
+          profileImage={user.profileImage}
           onMenuClick={() => setIsSidebarOpen(true)} 
         />
         

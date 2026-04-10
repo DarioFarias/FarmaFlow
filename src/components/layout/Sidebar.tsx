@@ -3,19 +3,19 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { UserRole } from '@/types'
-import { Package, Receipt, Users, Home, LayoutDashboard, Pill, Menu, X } from 'lucide-react'
+import { Package, Receipt, Users, Home, LayoutDashboard, Pill, Menu, X, UserCog } from 'lucide-react'
 import clsx from 'clsx'
 
 interface SidebarProps {
   role: UserRole
-  pharmacyName?: string
   isOpen: boolean
   setIsOpen: (val: boolean) => void
+  profileImage?: string
 }
 
-export function Sidebar({ role, pharmacyName, isOpen, setIsOpen }: SidebarProps) {
+export function Sidebar({ role, pharmacyName, isOpen, setIsOpen, profileImage }: SidebarProps) {
   const pathname = usePathname()
-  const isAdmin = role === UserRole.ADMIN
+  const isAdmin = role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN
 
   const navItems = isAdmin
     ? [
@@ -23,6 +23,7 @@ export function Sidebar({ role, pharmacyName, isOpen, setIsOpen }: SidebarProps)
         { name: 'Suministros', href: '/dashboard/suministros', icon: Package },
         { name: 'Auditoría Gastos', href: '/dashboard/gastos', icon: Receipt },
         { name: 'Farmacias', href: '/dashboard/admin/farmacias', icon: Users },
+        ...(role === UserRole.SUPER_ADMIN ? [{ name: 'Gestión Usuarios', href: '/dashboard/admin/usuarios', icon: UserCog }] : []),
       ]
     : [
         { name: 'Inicio', href: '/dashboard', icon: Home },
@@ -100,12 +101,16 @@ export function Sidebar({ role, pharmacyName, isOpen, setIsOpen }: SidebarProps)
           {/* Footer User Area */}
           <div className="p-4 border-t border-gray-100">
             <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-gray-50 border border-gray-200/60 shadow-sm">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-brand-500 to-brand-400 text-white flex items-center justify-center font-bold text-xs shadow-inner">
-                {isAdmin ? 'AD' : 'SU'}
+              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-brand-500 to-brand-400 text-white flex items-center justify-center font-bold text-xs shadow-inner overflow-hidden border border-brand-200">
+                {profileImage ? (
+                  <img src={profileImage} alt="Perfil" className="h-full w-full object-cover" />
+                ) : (
+                  role === UserRole.SUPER_ADMIN ? 'SA' : role === UserRole.ADMIN ? 'AD' : 'SU'
+                )}
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-gray-900 line-clamp-1">
-                  {isAdmin ? 'Supervisor' : 'Encargado'}
+                  {role === UserRole.SUPER_ADMIN ? 'Super Admin' : role === UserRole.ADMIN ? 'Supervisor' : 'Encargado'}
                 </span>
                 <span className="text-xs text-brand-600 font-medium">Activo</span>
               </div>

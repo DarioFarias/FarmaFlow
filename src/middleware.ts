@@ -1,6 +1,7 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 import { UserRole } from '@/types'
+import { isAdmin } from '@/lib/roles'
 
 // =============================================
 // FARMAFLOW - Middleware RBAC
@@ -15,10 +16,13 @@ export default withAuth(
     const role = token?.role as UserRole | undefined
 
     // Rutas exclusivas del ADMIN (Supervisor)
-    const adminRoutes = ['/dashboard/admin', '/dashboard/farmacias']
+    const adminRoutes = ['/dashboard/admin', '/dashboard/farmacias', '/api/admin']
     const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route))
 
-    if (isAdminRoute && role !== UserRole.ADMIN) {
+    if (isAdminRoute && !isAdmin(role)) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+      }
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
 
@@ -29,6 +33,9 @@ export default withAuth(
     )
 
     if (isPharmacyRoute && role !== UserRole.PHARMACY) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+      }
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
 
@@ -48,5 +55,6 @@ export const config = {
     '/api/supplies/:path*',
     '/api/expenses/:path*',
     '/api/users/:path*',
+    '/api/admin/:path*',
   ],
 }

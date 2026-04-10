@@ -33,6 +33,27 @@ export async function uploadInvoiceImage(
   }
 }
 
+// ---- Helper: subir foto de perfil ----
+export async function uploadProfileImage(
+  fileData: string,
+  userId: string
+): Promise<{ url: string; publicId: string }> {
+  const result = await cloudinary.uploader.upload(fileData, {
+    folder: `farmaflow/profiles/${userId}`,
+    resource_type: 'image',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [
+      { width: 300, height: 300, crop: 'fill', gravity: 'face' },
+      { quality: 'auto', fetch_format: 'auto' }
+    ],
+  })
+
+  return {
+    url: result.secure_url,
+    publicId: result.public_id,
+  }
+}
+
 // ---- Función helper: eliminar imagen ----
 export async function deleteInvoiceImage(publicId: string): Promise<void> {
   await cloudinary.uploader.destroy(publicId)

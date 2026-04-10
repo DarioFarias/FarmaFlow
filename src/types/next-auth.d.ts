@@ -16,6 +16,7 @@ declare module 'next-auth' {
       role: UserRole
       pharmacyName?: string
       pharmacyCode?: string
+      profileImage?: string
     }
   }
 
@@ -24,6 +25,7 @@ declare module 'next-auth' {
     role: UserRole
     pharmacyName?: string
     pharmacyCode?: string
+    profileImage?: string
   }
 }
 
@@ -33,5 +35,6 @@ declare module 'next-auth/jwt' {
     role: UserRole
     pharmacyName?: string
     pharmacyCode?: string
+    profileImage?: string
   }
 }

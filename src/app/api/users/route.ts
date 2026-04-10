@@ -6,6 +6,7 @@ import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import { createUserSchema } from '@/lib/validations'
 import { UserRole } from '@/types'
+import { isAdmin } from '@/lib/roles'
 
 // =============================================
 // API Route: POST /api/users
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
     // 1. Verificar sesión y permisos
     const session = await getServerSession(authOptions)
     
-    if (!session || session.user.role !== UserRole.ADMIN) {
+    if (!session || !isAdmin(session.user.role as UserRole)) {
       return NextResponse.json(
         { error: 'No autorizado. Se requiere acceso de administrador.' },
         { status: 403 }
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== UserRole.ADMIN) {
+    if (!session || !isAdmin(session.user.role as UserRole)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 

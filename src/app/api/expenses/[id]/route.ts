@@ -5,6 +5,7 @@ import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
 import { updateExpenseStatusSchema } from '@/lib/validations'
 import { UserRole, ApiResponse } from '@/types'
+import { isAdmin } from '@/lib/roles'
 
 // =============================================
 // GET /api/expenses/[id]
@@ -54,7 +55,7 @@ export async function PATCH(
       return NextResponse.json<ApiResponse>({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
-    if (session.user.role !== UserRole.ADMIN) {
+    if (!isAdmin(session.user.role as UserRole)) {
       return NextResponse.json<ApiResponse>({ success: false, error: 'Solo el supervisor puede revisar gastos' }, { status: 403 })
     }
 

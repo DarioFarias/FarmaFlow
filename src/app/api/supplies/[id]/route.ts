@@ -3,124 +3,75 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import SupplyRequest from '@/models/SupplyRequest'
-import { updateSupplyStatusSchema } from '@/lib/validations'
-import { UserRole, ApiResponse, SupplyRequestStatus } from '@/types'
+import { isAdmin } from '@/lib/roles'
+import { UserRole, SupplyRequestStatus } from '@/types'
 
-// Transiciones de estado válidas por rol
-const VALID_TRANSITIONS: Record<string, SupplyRequestStatus[]> = {
-  [UserRole.ADMIN]: [
-    SupplyRequestStatus.VALIDATING,
-    SupplyRequestStatus.AUTHORIZED,
-    SupplyRequestStatus.REJECTED,
-    SupplyRequestStatus.SHIPPED,
-  ],
-  [UserRole.PHARMACY]: [SupplyRequestStatus.RECEIVED],
-}
-
-// =============================================
-// GET /api/supplies/[id]
-// =============================================
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'No autorizado' }, { status: 401 })
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
     await connectDB()
-    const request = await SupplyRequest.findById(params.id).lean()
+    const supplyRequest = await SupplyRequest.findById(params.id)
 
-    if (!request) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'Pedido no encontrado' }, { status: 404 })
+    if (!supplyRequest) {
+      return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
     }
 
-    // PHARMACY solo puede ver sus propios pedidos
-    if (
-      session.user.role === UserRole.PHARMACY &&
-      request.pharmacy.toString() !== session.user.id
-    ) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'Acceso denegado' }, { status: 403 })
+    // Seguridad básica: farmacias solo ven sus propios pedidos
+    if (session.user.role === UserRole.PHARMACY && supplyRequest.pharmacy.toString() !== session.user.id) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    return NextResponse.json<ApiResponse>({ success: true, data: request })
+    return NextResponse.json(supplyRequest)
   } catch (error) {
-    console.error('[GET /api/supplies/[id]]', error)
-    return NextResponse.json<ApiResponse>({ success: false, error: 'Error interno' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al obtener el pedido' }, { status: 500 })
   }
 }
 
-// =============================================
-// PATCH /api/supplies/[id]
-// Actualizar estado con validación de máquina de estados
-// =============================================
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'No autorizado' }, { status: 401 })
+    if (!session || !isAdmin(session.user.role as UserRole)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
-    const body = await req.json()
-    const validation = updateSupplyStatusSchema.safeParse(body)
-
-    if (!validation.success) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: validation.error.errors[0]?.message },
-        { status: 400 }
-      )
-    }
-
-    const { status, comment, rejectionReason, shippingDate, expectedDelivery } = validation.data
+    const { status, comment, adminNotes, rejectionReason } = await req.json()
+    const { id } = params
 
     await connectDB()
-    const request = await SupplyRequest.findById(params.id)
+    const supplyRequest = await SupplyRequest.findById(id)
 
-    if (!request) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'Pedido no encontrado' }, { status: 404 })
+    if (!supplyRequest) {
+      return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
     }
 
-    // Validar transición permitida para este rol
-    const allowedTransitions = VALID_TRANSITIONS[session.user.role] ?? []
-    if (!allowedTransitions.includes(status)) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: `El rol ${session.user.role} no puede mover a estado ${status}` },
-        { status: 403 }
-      )
-    }
+    // Actualizar estado y agregar historial
+    supplyRequest.status = status as SupplyRequestStatus
+    
+    if (adminNotes) supplyRequest.adminNotes = adminNotes
+    if (rejectionReason) supplyRequest.rejectionReason = rejectionReason
 
-    // PHARMACY solo puede actualizar sus propios pedidos
-    if (
-      session.user.role === UserRole.PHARMACY &&
-      request.pharmacy.toString() !== session.user.id
-    ) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'Acceso denegado' }, { status: 403 })
-    }
-
-    // Aplicar cambios
-    request.status = status
-    request.statusHistory.push({
-      status,
+    supplyRequest.statusHistory.push({
+      status: status as SupplyRequestStatus,
       changedBy: session.user.id,
       changedAt: new Date(),
-      comment,
+      comment: comment || adminNotes || rejectionReason
     })
 
-    if (rejectionReason) request.rejectionReason = rejectionReason
-    if (shippingDate) request.shippingDate = new Date(shippingDate)
-    if (expectedDelivery) request.expectedDelivery = new Date(expectedDelivery)
-    if (status === SupplyRequestStatus.RECEIVED) request.receivedAt = new Date()
+    await supplyRequest.save()
 
-    await request.save()
-
-    return NextResponse.json<ApiResponse>({ success: true, data: request })
+    return NextResponse.json(supplyRequest)
   } catch (error) {
-    console.error('[PATCH /api/supplies/[id]]', error)
-    return NextResponse.json<ApiResponse>({ success: false, error: 'Error interno' }, { status: 500 })
+    console.error('API_SUPPLIES_PATCH_ERROR:', error)
+    return NextResponse.json({ error: 'Error al actualizar el pedido' }, { status: 500 })
   }
 }

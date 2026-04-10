@@ -5,8 +5,10 @@ import SupplyRequest from '@/models/SupplyRequest'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { UserRole, SupplyRequestStatus } from '@/types'
+import { isAdmin } from '@/lib/roles'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { AuditActions } from '@/components/audit/AuditActions'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,18 +50,21 @@ export default async function SuministrosPage() {
             <tr className="bg-gray-50/50 border-b border-gray-100">
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Nº Pedido</th>
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Fecha</th>
-              {session?.user.role === UserRole.ADMIN && (
+              {isAdmin(session?.user.role as UserRole) && (
                 <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Sucursal</th>
               )}
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Ítems</th>
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Prioridad</th>
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Estado</th>
+              {isAdmin(session?.user.role as UserRole) && (
+                <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Auditoría</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {pedidos.length === 0 ? (
               <tr>
-                <td colSpan={session?.user.role === UserRole.ADMIN ? 6 : 5} className="py-12 text-center">
+                <td colSpan={isAdmin(session?.user.role as UserRole) ? 7 : 5} className="py-12 text-center">
                   <Package size={32} className="mx-auto mb-3 text-gray-300" />
                   <p className="text-gray-400 text-sm italic">No hay pedidos registrados todavía.</p>
                 </td>
@@ -75,7 +80,7 @@ export default async function SuministrosPage() {
                     <td className="py-3 px-4 text-xs text-gray-500">
                       {format(new Date(p.createdAt), 'dd MMM, HH:mm', { locale: es })}
                     </td>
-                    {session?.user.role === UserRole.ADMIN && (
+                    {isAdmin(session?.user.role as UserRole) && (
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {p.pharmacyName}
                       </td>
@@ -104,6 +109,11 @@ export default async function SuministrosPage() {
                         {statusInfo.label}
                       </span>
                     </td>
+                    {isAdmin(session?.user.role as UserRole) && (
+                      <td className="py-3 px-4">
+                        <AuditActions id={p._id.toString()} type="supply" currentStatus={p.status} />
+                      </td>
+                    )}
                   </tr>
                 )
               })

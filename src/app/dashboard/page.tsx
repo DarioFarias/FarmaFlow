@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
-  const isAdmin = session?.user.role === UserRole.ADMIN
+  const isAdmin = session?.user.role === UserRole.ADMIN || session?.user.role === UserRole.SUPER_ADMIN
 
   await connectDB()
 

@@ -5,8 +5,10 @@ import Expense from '@/models/Expense'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { UserRole, ExpenseStatus } from '@/types'
+import { isAdmin } from '@/lib/roles'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { AuditActions } from '@/components/audit/AuditActions'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,7 +47,7 @@ export default async function GastosPage() {
           <thead>
             <tr className="bg-gray-50/50 border-b border-gray-100">
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Fecha Ticket</th>
-              {session?.user.role === UserRole.ADMIN && (
+              {isAdmin(session?.user.role as UserRole) && (
                 <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Sucursal</th>
               )}
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Categoría</th>
@@ -58,7 +60,7 @@ export default async function GastosPage() {
           <tbody>
             {gastos.length === 0 ? (
               <tr>
-                <td colSpan={session?.user.role === UserRole.ADMIN ? 7 : 6} className="py-12 text-center text-gray-400 italic text-sm">
+                <td colSpan={isAdmin(session?.user.role as UserRole) ? 7 : 6} className="py-12 text-center text-gray-400 italic text-sm">
                   <Receipt size={32} className="mx-auto mb-3 text-gray-200" />
                   No hay gastos registrados por el momento.
                 </td>
@@ -71,7 +73,7 @@ export default async function GastosPage() {
                     <td className="py-4 px-4 text-xs font-medium text-gray-500">
                       {format(new Date(g.receiptDate), 'dd/MM/yyyy')}
                     </td>
-                    {session?.user.role === UserRole.ADMIN && (
+                    {isAdmin(session?.user.role as UserRole) && (
                       <td className="py-4 px-4 text-sm font-semibold text-gray-900">
                         {g.pharmacyName}
                       </td>
@@ -92,7 +94,7 @@ export default async function GastosPage() {
                         {statusInfo.label.toUpperCase()}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-right">
+                    <td className="py-4 px-4 text-right flex items-center justify-end gap-2">
                       {g.invoiceImageUrl && (
                         <a 
                           href={g.invoiceImageUrl} 
@@ -103,6 +105,9 @@ export default async function GastosPage() {
                         >
                           <Eye size={16} />
                         </a>
+                      )}
+                      {isAdmin(session?.user.role as UserRole) && (
+                        <AuditActions id={g.id.toString()} type="expense" currentStatus={g.status} />
                       )}
                     </td>
                   </tr>

@@ -7,8 +7,9 @@
 // ---- ENUMS DE ROLES ----
 
 export enum UserRole {
-  ADMIN = 'ADMIN',         // Supervisor: puede autorizar, rechazar, despachar
-  PHARMACY = 'PHARMACY',   // Farmacia sucursal: puede solicitar y confirmar recepción
+  SUPER_ADMIN = 'SUPER_ADMIN', // Te ves todo y controlás a los administradores
+  ADMIN = 'ADMIN',             // Supervisor: puede autorizar, rechazar, despachar
+  PHARMACY = 'PHARMACY',       // Farmacia sucursal: puede solicitar y confirmar recepción
 }
 
 // ---- MÁQUINA DE ESTADOS: REQUERIMIENTOS DE SUMINISTROS ----
@@ -67,6 +68,8 @@ export interface IUser {
   pharmacyCode?: string     // Código único de sucursal ej: "FAR-001"
   phone?: string
   isActive: boolean
+  profileImage?: string     // URL de Cloudinary
+  profileImagePublicId?: string // ID de Cloudinary para gestión
   createdAt: Date
   updatedAt: Date
 }
