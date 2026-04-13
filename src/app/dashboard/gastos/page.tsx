@@ -15,7 +15,8 @@ export const dynamic = 'force-dynamic'
 const STATUS_CONFIG: Record<string, { label: string, classes: string }> = {
   [ExpenseStatus.PENDING]: { label: 'Pendiente', classes: 'bg-amber-50 text-amber-700 ring-amber-600/20' },
   [ExpenseStatus.APPROVED]: { label: 'Aprobado', classes: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' },
-  [ExpenseStatus.REJECTED]: { label: 'Rechazado', classes: 'bg-red-50 text-red-700 ring-red-600/20' },
+  [ExpenseStatus.REVIEWED]: { label: 'Revisado', classes: 'bg-blue-50 text-blue-700 ring-blue-600/20' },
+  [ExpenseStatus.DISPUTED]: { label: 'Disputado', classes: 'bg-red-50 text-red-700 ring-red-600/20' },
 }
 
 export default async function GastosPage() {
