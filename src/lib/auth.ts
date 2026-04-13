@@ -29,7 +29,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email y contraseña son requeridos')
+          return null
         }
 
         await connectDB()
@@ -41,7 +41,7 @@ export const authOptions: NextAuthOptions = {
         }).select('+password')
 
         if (!user) {
-          throw new Error('Credenciales inválidas')
+          return null
         }
 
         const isPasswordValid = await bcrypt.compare(
@@ -50,7 +50,7 @@ export const authOptions: NextAuthOptions = {
         )
 
         if (!isPasswordValid) {
-          throw new Error('Credenciales inválidas')
+          return null
         }
 
         return {

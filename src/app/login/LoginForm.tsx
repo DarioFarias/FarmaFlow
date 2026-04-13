@@ -43,7 +43,12 @@ export function LoginForm() {
       })
 
       if (result?.error) {
-        toast.error('Credenciales incorrectas. Verifica tu email y contraseña.')
+        // Error de NextAuth: CredentialsSignin indica credenciales inválidas
+        if (result.error === 'CredentialsSignin') {
+          toast.error('Credenciales incorrectas. Verifica tu email y contraseña.')
+        } else {
+          toast.error('Error al iniciar sesión. Intenta de nuevo.')
+        }
       } else {
         toast.success('¡Bienvenido a FarmaFlow!')
         router.push(callbackUrl)
