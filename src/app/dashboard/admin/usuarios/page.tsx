@@ -34,6 +34,7 @@ const initialFormData: UserFormData = {
 
 export default function UsuariosAdminPage() {
   const [users, setUsers] = useState<IUser[]>([])
+  const [pharmacies, setPharmacies] = useState<IUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
   
@@ -49,10 +50,24 @@ export default function UsuariosAdminPage() {
   const [newPassword, setNewPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchUsers()
+    fetchPharmacies()
   }, [])
+
+  const fetchPharmacies = async () => {
+    try {
+      const res = await fetch('/api/admin/users?role=PHARMACY')
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        setPharmacies(data.filter((u: IUser) => u.pharmacyCode))
+      }
+    } catch (error) {
+      console.error('Error fetching pharmacies:', error)
+    }
+  }
 
   const fetchUsers = async () => {
     try {
@@ -119,6 +134,7 @@ export default function UsuariosAdminPage() {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setFormError(null)
     
     try {
       const res = await fetch('/api/admin/users', {
@@ -128,12 +144,13 @@ export default function UsuariosAdminPage() {
       })
       
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al crear usuario')
+      if (!res.ok) throw new Error(data.error || data.details || 'Error al crear usuario')
       
       toast.success('Usuario creado correctamente')
       setShowCreateModal(false)
       fetchUsers()
     } catch (error: any) {
+      setFormError(error.message || 'Error al crear usuario')
       toast.error(error.message || 'Error al crear usuario')
     } finally {
       setIsSubmitting(false)
@@ -153,6 +170,7 @@ export default function UsuariosAdminPage() {
       phone: user.phone || '',
       assignedPharmacies: (user as any).assignedPharmacies || [],
     })
+    setFormError(null)
     setShowEditModal(true)
   }
 
@@ -160,6 +178,7 @@ export default function UsuariosAdminPage() {
     e.preventDefault()
     if (!selectedUser) return
     setIsSubmitting(true)
+    setFormError(null)
     
     try {
       // Filtrar campos no vacíos
@@ -179,12 +198,13 @@ export default function UsuariosAdminPage() {
       })
       
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al actualizar usuario')
+      if (!res.ok) throw new Error(data.error || data.details || 'Error al actualizar usuario')
       
       toast.success('Usuario actualizado correctamente')
       setShowEditModal(false)
       fetchUsers()
     } catch (error: any) {
+      setFormError(error.message || 'Error al actualizar usuario')
       toast.error(error.message || 'Error al actualizar usuario')
     } finally {
       setIsSubmitting(false)
@@ -467,15 +487,34 @@ export default function UsuariosAdminPage() {
               )}
               {formData.role === 'SUPERVISOR' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Farmacias Asignadas</label>
-                  <p className="text-xs text-gray-500 mb-2">Selecciona los códigos de farmacia separados por coma</p>
-                  <input
-                    type="text"
-                    value={formData.assignedPharmacies.join(', ')}
-                    onChange={(e) => setFormData({ ...formData, assignedPharmacies: e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                    placeholder="FAR-001, FAR-002, FAR-003"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Farmacias Asignadas</label>
+                  {pharmacies.length === 0 ? (
+                    <p className="text-sm text-gray-500 italic">No hay farmacias registradas. Crea primero farmacias con rol PHARMACY.</p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
+                      {pharmacies.map((pharmacy) => (
+                        <label key={pharmacy._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                          <input
+                            type="checkbox"
+                            checked={formData.assignedPharmacies.includes(pharmacy.pharmacyCode!)}
+                            onChange={(e) => {
+                              const code = pharmacy.pharmacyCode!
+                              if (e.target.checked) {
+                                setFormData({ ...formData, assignedPharmacies: [...formData.assignedPharmacies, code] })
+                              } else {
+                                setFormData({ ...formData, assignedPharmacies: formData.assignedPharmacies.filter(c => c !== code) })
+                              }
+                            }}
+                            className="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500"
+                          />
+                          <span className="text-sm">
+                            <span className="font-semibold text-gray-900">{pharmacy.pharmacyCode}</span>
+                            <span className="text-gray-500"> - {pharmacy.pharmacyName}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               <div>
@@ -488,6 +527,11 @@ export default function UsuariosAdminPage() {
                   placeholder="+54 11 1234 5678"
                 />
               </div>
+              {formError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {formError}
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
@@ -574,16 +618,36 @@ export default function UsuariosAdminPage() {
                   </div>
                 </>
               )}
-              {formData.role === 'SUPERVISOR' && (
+                  {formData.role === 'SUPERVISOR' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Farmacias Asignadas</label>
-                  <input
-                    type="text"
-                    value={formData.assignedPharmacies.join(', ')}
-                    onChange={(e) => setFormData({ ...formData, assignedPharmacies: e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                    placeholder="FAR-001, FAR-002"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Farmacias Asignadas</label>
+                  {pharmacies.length === 0 ? (
+                    <p className="text-sm text-gray-500 italic">No hay farmacias registradas.</p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
+                      {pharmacies.map((pharmacy) => (
+                        <label key={pharmacy._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                          <input
+                            type="checkbox"
+                            checked={formData.assignedPharmacies.includes(pharmacy.pharmacyCode!)}
+                            onChange={(e) => {
+                              const code = pharmacy.pharmacyCode!
+                              if (e.target.checked) {
+                                setFormData({ ...formData, assignedPharmacies: [...formData.assignedPharmacies, code] })
+                              } else {
+                                setFormData({ ...formData, assignedPharmacies: formData.assignedPharmacies.filter(c => c !== code) })
+                              }
+                            }}
+                            className="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500"
+                          />
+                          <span className="text-sm">
+                            <span className="font-semibold text-gray-900">{pharmacy.pharmacyCode}</span>
+                            <span className="text-gray-500"> - {pharmacy.pharmacyName}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               <div>
@@ -595,6 +659,11 @@ export default function UsuariosAdminPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                 />
               </div>
+              {formError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {formError}
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"

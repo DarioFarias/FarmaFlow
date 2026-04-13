@@ -20,7 +20,16 @@ export async function GET(req: NextRequest) {
     }
 
     await connectDB()
-    const users = await User.find({}).sort({ createdAt: -1 })
+    
+    const { searchParams } = new URL(req.url)
+    const roleFilter = searchParams.get('role')
+    
+    let query = {}
+    if (roleFilter) {
+      query = { role: roleFilter }
+    }
+    
+    const users = await User.find(query).sort({ createdAt: -1 })
     
     return NextResponse.json(users)
   } catch (error) {
