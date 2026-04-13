@@ -11,10 +11,10 @@ import { Loader2, ArrowLeft, Plus, Trash2, Send } from 'lucide-react'
 import Link from 'next/link'
 
 const CATEGORIES = [
-  { value: SupplyCategory.PAPELERIA, label: 'Papelería / Oficina' },
-  { value: SupplyCategory.LIMPIEZA, label: 'Limpieza' },
-  { value: SupplyCategory.INSUMO_FARMACIA, label: 'Insumos de Farmacia' },
-  { value: SupplyCategory.OTROS, label: 'Otros' },
+  { value: SupplyCategory.OFFICE_SUPPLIES, label: 'Papelería / Oficina' },
+  { value: SupplyCategory.CLEANING, label: 'Limpieza' },
+  { value: SupplyCategory.PHARMACY_SUPPLIES, label: 'Insumos de Farmacia' },
+  { value: SupplyCategory.OTHER, label: 'Otros' },
 ]
 
 const UNITS = ['Unidades', 'Cajas', 'Packs', 'Litros', 'Kilos', 'Bolsas']
@@ -31,7 +31,7 @@ export function SupplyRequestForm() {
   } = useForm<CreateSupplyRequestInput>({
     resolver: zodResolver(createSupplyRequestSchema),
     defaultValues: {
-      items: [{ name: '', category: SupplyCategory.INSUMO_FARMACIA, quantity: 1, unit: 'Unidades' }],
+      items: [{ name: '', category: SupplyCategory.PHARMACY_SUPPLIES, quantity: 1, unit: 'Unidades' }],
       priority: 'NORMAL',
     },
   })
@@ -85,7 +85,7 @@ export function SupplyRequestForm() {
             </div>
             <button
               type="button"
-              onClick={() => append({ name: '', category: SupplyCategory.INSUMO_FARMACIA, quantity: 1, unit: 'Unidades' })}
+              onClick={() => append({ name: '', category: SupplyCategory.PHARMACY_SUPPLIES, quantity: 1, unit: 'Unidades' })}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 bg-brand-50 rounded-xl hover:bg-brand-100 transition-colors"
             >
               <Plus size={16} />

@@ -12,12 +12,12 @@ import Link from 'next/link'
 import { compressImage } from '@/lib/image-utils'
 
 const CATEGORIES = [
-  { value: ExpenseCategory.SERVICIOS, label: 'Luz, Agua, Gas, Internet' },
-  { value: ExpenseCategory.MANTENIMIENTO, label: 'Reparaciones y Mantenimiento' },
-  { value: ExpenseCategory.ALQUILER, label: 'Alquiler / Expensas' },
-  { value: ExpenseCategory.SUELDOS, label: 'Sueldos / Comisiones' },
-  { value: ExpenseCategory.IMPUESTOS, label: 'Impuestos y Tasas' },
-  { value: ExpenseCategory.OTROS, label: 'Otros Gastos' },
+  { value: ExpenseCategory.UTILITIES, label: 'Luz, Agua, Gas, Internet' },
+  { value: ExpenseCategory.MAINTENANCE, label: 'Reparaciones y Mantenimiento' },
+  { value: ExpenseCategory.RENT, label: 'Alquiler / Expensas' },
+  { value: ExpenseCategory.SALARIES, label: 'Sueldos / Comisiones' },
+  { value: ExpenseCategory.TAXES, label: 'Impuestos y Tasas' },
+  { value: ExpenseCategory.OTHER, label: 'Otros Gastos' },
 ]
 
 export function ExpenseForm() {

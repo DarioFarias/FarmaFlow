@@ -26,11 +26,10 @@ export enum SupplyRequestStatus {
 // ---- CATEGORÍAS DE SUMINISTROS ----
 
 export enum SupplyCategory {
-  TICKET_PAPER   = 'TICKET_PAPER',   // Papel ticket para impresoras
-  REAMS          = 'REAMS',          // Resmas de papel A4
-  CLEANING       = 'CLEANING',       // Artículos de limpieza
-  OFFICE         = 'OFFICE',         // Materiales de oficina
-  OTHER          = 'OTHER',          // Otros
+  OFFICE_SUPPLIES = 'PAPELERIA',    // Papelería / Oficina
+  CLEANING = 'LIMPIEZA',            // Artículos de limpieza
+  PHARMACY_SUPPLIES = 'INSUMO_FARMACIA', // Insumos de Farmacia
+  OTHER = 'OTROS',                  // Otros
 }
 
 // ---- ESTADOS DE REPORTE DE GASTOS ----
@@ -45,11 +44,12 @@ export enum ExpenseStatus {
 // ---- CATEGORÍAS DE GASTOS ----
 
 export enum ExpenseCategory {
-  MAINTENANCE  = 'MAINTENANCE',  // Mantenimiento
-  UTILITIES    = 'UTILITIES',    // Servicios (luz, agua, etc.)
-  SUPPLIES     = 'SUPPLIES',     // Insumos de emergencia compra directa
-  TRANSPORT    = 'TRANSPORT',    // Transporte / envíos
-  OTHER        = 'OTHER',        // Otros
+  MAINTENANCE = 'MANTENIMIENTO',  // Reparaciones y Mantenimiento
+  UTILITIES = 'SERVICIOS',        // Luz, Agua, Gas, Internet
+  RENT = 'ALQUILER',              // Alquiler / Expensas
+  SALARIES = 'SUELDOS',          // Sueldos / Comisiones
+  TAXES = 'IMPUESTOS',            // Impuestos y Tasas
+  OTHER = 'OTROS',                // Otros Gastos
 }
 
 // =============================================
