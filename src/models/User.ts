@@ -51,7 +51,7 @@ const UserSchema = new Schema<IUserDocument>(
       sparse: true,   // Permite múltiples documentos con null
       uppercase: true,
       trim: true,
-      match: [/^FAR-\d{3}$/, 'El código debe tener formato FAR-001'],
+      maxlength: [20, 'El código no puede superar 20 caracteres'],
     },
     phone: {
       type: String,

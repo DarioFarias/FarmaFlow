@@ -24,11 +24,8 @@ export const createUserSchema = z.object({
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   role: z.enum(['ADMIN', 'PHARMACY']).default('PHARMACY'),
   pharmacyName: z.string().min(1, 'El nombre de sucursal es requerido').max(100).trim().optional(),
-  pharmacyCode: z
-    .string()
-    .regex(/^FAR-\d{3}$/, 'El código debe tener formato FAR-001')
-    .optional(),
-  phone: z.string().optional(),
+  pharmacyCode: z.string().max(20).trim().optional(),
+  phone: z.string().max(30).trim().optional(),
 })
 
 // Schema para Super Admin - puede crear usuarios ADMIN o PHARMACY
@@ -40,11 +37,8 @@ export const adminCreateUserSchema = z.object({
     errorMap: () => ({ message: 'El rol debe ser ADMIN o PHARMACY' }),
   }),
   pharmacyName: z.string().max(100).trim().optional(),
-  pharmacyCode: z
-    .string()
-    .regex(/^FAR-\d{3}$/, 'El código debe tener formato FAR-001')
-    .optional(),
-  phone: z.string().optional(),
+  pharmacyCode: z.string().max(20).trim().optional(),
+  phone: z.string().max(30).trim().optional(),
 }).refine((data) => {
   // Si es PHARMACY, pharmacyName es requerido
   if (data.role === 'PHARMACY') {
@@ -62,11 +56,8 @@ export const adminUpdateUserSchema = z.object({
   email: z.string().email().toLowerCase().trim().optional(),
   role: z.enum(['ADMIN', 'PHARMACY']).optional(),
   pharmacyName: z.string().max(100).trim().optional(),
-  pharmacyCode: z
-    .string()
-    .regex(/^FAR-\d{3}$/, 'El código debe tener formato FAR-001')
-    .optional(),
-  phone: z.string().optional(),
+  pharmacyCode: z.string().max(20).trim().optional(),
+  phone: z.string().max(30).trim().optional(),
   isActive: z.boolean().optional(),
 })
 
