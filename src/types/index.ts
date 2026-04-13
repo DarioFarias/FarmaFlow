@@ -18,9 +18,11 @@ export enum SupplyRequestStatus {
   REQUESTED  = 'REQUESTED',   // Farmacia creó el pedido
   VALIDATING = 'VALIDATING',  // Supervisor revisando
   AUTHORIZED = 'AUTHORIZED',  // Supervisor aprobó
-  REJECTED   = 'REJECTED',    // Supervisor rechazó
-  SHIPPED    = 'SHIPPED',     // Suministros enviados desde depósito
-  RECEIVED   = 'RECEIVED',    // Farmacia confirmó recepción
+  APPROVED   = 'APPROVED',     // Aprobado (sinónimo de AUTHORIZED)
+  REJECTED   = 'REJECTED',     // Supervisor rechazó
+  SHIPPED    = 'SHIPPED',      // Suministros enviados desde depósito
+  DELIVERED  = 'DELIVERED',    // Entregado/recibido
+  RECEIVED   = 'RECEIVED',     // Farmacia confirmó recepción
 }
 
 // ---- CATEGORÍAS DE SUMINISTROS ----

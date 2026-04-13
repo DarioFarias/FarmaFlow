@@ -84,7 +84,12 @@ async function seedTestData() {
   await mongoose.connect(MONGODB_URI!)
   console.log('✅ Conectado\n')
 
-  const usersCollection = mongoose.connection.db.collection('users')
+  const db = mongoose.connection.db
+  if (!db) {
+    console.error('❌ Error: No se pudo obtener la base de datos')
+    process.exit(1)
+  }
+  const usersCollection = db.collection('users')
 
   let created = 0
   let skipped = 0

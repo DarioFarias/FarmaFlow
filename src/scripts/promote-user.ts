@@ -22,6 +22,10 @@ async function promote() {
     
     // Usamos el nombre de la colección directamente para evitar problemas con el modelo de TS
     const db = mongoose.connection.db
+    if (!db) {
+      console.error('Error: No se pudo obtener la base de datos')
+      return
+    }
     const usersCollection = db.collection('users')
 
     const result = await usersCollection.updateOne(

@@ -1,4 +1,4 @@
-import { mongoose } from 'mongoose'
+import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
 import * as dotenv from 'dotenv'
 import path from 'path'
@@ -17,7 +17,7 @@ async function seed() {
   try {
     console.log('⏳ Intentando conexión DIRECTA a un shard (bypass SRV/RS)...')
     // Probamos con la URL corta que me pasaste al principio, pero forzando IPv4 en el proceso
-    const connectionString = MONGODB_URI;
+    const connectionString = MONGODB_URI as string
     console.log('🔗 Usando URI:', connectionString.replace(/:[^:@]+@/, ':****@'))
     
     await mongoose.connect(connectionString, {

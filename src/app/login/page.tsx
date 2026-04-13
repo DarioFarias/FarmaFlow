@@ -1,9 +1,26 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { LoginForm } from './LoginForm'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = { 
   title: 'Iniciar sesión',
   description: 'Accede al panel de control de FarmaFlow'
+}
+
+function LoginFormFallback() {
+  return (
+    <div className="card shadow-xl border-t-4 border-brand-500">
+      <div className="animate-pulse space-y-5">
+        <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+        <div className="h-10 bg-gray-200 rounded"></div>
+        <div className="h-4 bg-gray-200 rounded w-1/4 mb-2 mt-4"></div>
+        <div className="h-10 bg-gray-200 rounded"></div>
+        <div className="h-12 bg-gray-200 rounded mt-6"></div>
+      </div>
+    </div>
+  )
 }
 
 export default function LoginPage() {
@@ -25,7 +42,9 @@ export default function LoginPage() {
         </div>
 
         {/* Client Side Login Form */}
-        <LoginForm />
+        <Suspense fallback={<LoginFormFallback />}>
+          <LoginForm />
+        </Suspense>
 
         {/* Footer Support */}
         <div className="text-center mt-8">

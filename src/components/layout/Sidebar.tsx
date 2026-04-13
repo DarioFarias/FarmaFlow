@@ -8,6 +8,7 @@ import clsx from 'clsx'
 
 interface SidebarProps {
   role: UserRole
+  pharmacyName?: string
   isOpen: boolean
   setIsOpen: (val: boolean) => void
   profileImage?: string
