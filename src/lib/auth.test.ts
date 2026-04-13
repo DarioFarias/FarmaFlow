@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isAdmin, isPharmacy } from './auth'
+import { isAdmin, isPharmacy } from './roles'
 import { UserRole } from '../types'
 
 describe('Auth Helpers', () => {

@@ -77,9 +77,8 @@ const UserSchema = new Schema<IUserDocument>(
 )
 
 // ---- ÍNDICES ----
-UserSchema.index({ email: 1 })
+// Nota: email y pharmacyCode ya tienen índices por unique: true
 UserSchema.index({ role: 1 })
-UserSchema.index({ pharmacyCode: 1 })
 UserSchema.index({ isActive: 1 })
 
 // ---- MODELO ----
