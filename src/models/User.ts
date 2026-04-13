@@ -69,6 +69,10 @@ const UserSchema = new Schema<IUserDocument>(
       type: String,
       trim: true,
     },
+    assignedPharmacies: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true, // Auto-gestiona createdAt y updatedAt

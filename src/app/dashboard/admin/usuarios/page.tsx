@@ -14,10 +14,11 @@ interface UserFormData {
   name: string
   email: string
   password: string
-  role: 'ADMIN' | 'PHARMACY'
+  role: 'ADMIN' | 'SUPERVISOR' | 'PHARMACY'
   pharmacyName: string
   pharmacyCode: string
   phone: string
+  assignedPharmacies: string[]
 }
 
 const initialFormData: UserFormData = {
@@ -28,6 +29,7 @@ const initialFormData: UserFormData = {
   pharmacyName: '',
   pharmacyCode: '',
   phone: '',
+  assignedPharmacies: [],
 }
 
 export default function UsuariosAdminPage() {
@@ -145,10 +147,11 @@ export default function UsuariosAdminPage() {
       name: user.name,
       email: user.email,
       password: '',
-      role: user.role as 'ADMIN' | 'PHARMACY',
+      role: user.role as 'ADMIN' | 'SUPERVISOR' | 'PHARMACY',
       pharmacyName: user.pharmacyName || '',
       pharmacyCode: user.pharmacyCode || '',
       phone: user.phone || '',
+      assignedPharmacies: (user as any).assignedPharmacies || [],
     })
     setShowEditModal(true)
   }
@@ -167,6 +170,7 @@ export default function UsuariosAdminPage() {
       if (formData.pharmacyName) updateData.pharmacyName = formData.pharmacyName
       if (formData.pharmacyCode) updateData.pharmacyCode = formData.pharmacyCode
       if (formData.phone) updateData.phone = formData.phone
+      if (formData.role === 'SUPERVISOR') updateData.assignedPharmacies = formData.assignedPharmacies
 
       const res = await fetch(`/api/admin/users/${selectedUser._id}`, {
         method: 'PATCH',
@@ -307,11 +311,17 @@ export default function UsuariosAdminPage() {
                       className="text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none focus:ring-1 ring-brand-500"
                     >
                       <option value="PHARMACY">PHARMACY</option>
+                      <option value="SUPERVISOR">SUPERVISOR</option>
                       <option value="ADMIN">ADMIN</option>
+                      <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                     </select>
                   </td>
                   <td className="py-4 px-4 text-sm text-gray-600">
-                    {u.pharmacyName || u.pharmacyCode || '---'}
+                    {u.role === 'SUPERVISOR' && u.assignedPharmacies?.length ? (
+                      <span className="text-xs">{u.assignedPharmacies.join(', ')}</span>
+                    ) : (
+                      u.pharmacyName || u.pharmacyCode || '---'
+                    )}
                   </td>
                   <td className="py-4 px-4">
                     <span className={clsx(
@@ -422,10 +432,11 @@ export default function UsuariosAdminPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'PHARMACY' })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'SUPERVISOR' | 'PHARMACY', assignedPharmacies: e.target.value === 'SUPERVISOR' ? formData.assignedPharmacies : [] })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                 >
                   <option value="PHARMACY">PHARMACY</option>
+                  <option value="SUPERVISOR">SUPERVISOR</option>
                   <option value="ADMIN">ADMIN</option>
                 </select>
               </div>
@@ -451,9 +462,21 @@ export default function UsuariosAdminPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                       placeholder="FAR-001"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Formato: FAR-001</p>
                   </div>
                 </>
+              )}
+              {formData.role === 'SUPERVISOR' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Farmacias Asignadas</label>
+                  <p className="text-xs text-gray-500 mb-2">Selecciona los códigos de farmacia separados por coma</p>
+                  <input
+                    type="text"
+                    value={formData.assignedPharmacies.join(', ')}
+                    onChange={(e) => setFormData({ ...formData, assignedPharmacies: e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+                    placeholder="FAR-001, FAR-002, FAR-003"
+                  />
+                </div>
               )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
@@ -521,31 +544,48 @@ export default function UsuariosAdminPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'PHARMACY' })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'SUPERVISOR' | 'PHARMACY', assignedPharmacies: e.target.value === 'SUPERVISOR' ? formData.assignedPharmacies : [] })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                 >
                   <option value="PHARMACY">PHARMACY</option>
+                  <option value="SUPERVISOR">SUPERVISOR</option>
                   <option value="ADMIN">ADMIN</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de Sucursal</label>
-                <input
-                  type="text"
-                  value={formData.pharmacyName}
-                  onChange={(e) => setFormData({ ...formData, pharmacyName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Código de Sucursal</label>
-                <input
-                  type="text"
-                  value={formData.pharmacyCode}
-                  onChange={(e) => setFormData({ ...formData, pharmacyCode: e.target.value.toUpperCase() })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                />
-              </div>
+              {formData.role === 'PHARMACY' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de Sucursal</label>
+                    <input
+                      type="text"
+                      value={formData.pharmacyName}
+                      onChange={(e) => setFormData({ ...formData, pharmacyName: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Código de Sucursal</label>
+                    <input
+                      type="text"
+                      value={formData.pharmacyCode}
+                      onChange={(e) => setFormData({ ...formData, pharmacyCode: e.target.value.toUpperCase() })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+                    />
+                  </div>
+                </>
+              )}
+              {formData.role === 'SUPERVISOR' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Farmacias Asignadas</label>
+                  <input
+                    type="text"
+                    value={formData.assignedPharmacies.join(', ')}
+                    onChange={(e) => setFormData({ ...formData, assignedPharmacies: e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+                    placeholder="FAR-001, FAR-002"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
                 <input

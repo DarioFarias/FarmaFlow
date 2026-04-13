@@ -61,6 +61,7 @@ export const authOptions: NextAuthOptions = {
           pharmacyName: user.pharmacyName,
           pharmacyCode: user.pharmacyCode,
           profileImage: user.profileImage,
+          assignedPharmacies: user.assignedPharmacies || [],
         }
       },
     }),
@@ -74,6 +75,7 @@ export const authOptions: NextAuthOptions = {
         token.pharmacyName = (user as any).pharmacyName
         token.pharmacyCode = (user as any).pharmacyCode
         token.profileImage = (user as any).profileImage
+        token.assignedPharmacies = (user as any).assignedPharmacies || []
       }
       return token
     },
@@ -85,6 +87,7 @@ export const authOptions: NextAuthOptions = {
         session.user.pharmacyName = token.pharmacyName as string | undefined
         session.user.pharmacyCode = token.pharmacyCode as string | undefined
         session.user.profileImage = token.profileImage as string | undefined
+        session.user.assignedPharmacies = token.assignedPharmacies as string[] | undefined
       }
       return session
     },

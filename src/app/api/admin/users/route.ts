@@ -3,17 +3,20 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
-import { isSuperAdmin } from '@/lib/roles'
+import { isSuperAdmin, isAdmin } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { adminCreateUserSchema } from '@/lib/validations'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
+// Roles que un ADMIN puede crear (NO puede crear ADMIN ni SUPER_ADMIN)
+const ADMIN_CAN_CREATE_ROLES = [UserRole.SUPERVISOR, UserRole.PHARMACY]
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
-      return NextResponse.json({ error: 'No autorizado. Se requiere nivel Super Admin.' }, { status: 403 })
+    if (!session || (!isSuperAdmin(session.user.role as UserRole) && !isAdmin(session.user.role as UserRole))) {
+      return NextResponse.json({ error: 'No autorizado. Se requiere nivel Admin oSuper Admin.' }, { status: 403 })
     }
 
     await connectDB()
@@ -28,8 +31,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
-      return NextResponse.json({ error: 'No autorizado. Se requiere nivel Super Admin.' }, { status: 403 })
+    const userRole = session?.user?.role as UserRole
+    
+    // Verificar que el usuario tenga permisos de Admin o Super Admin
+    if (!session || (!isSuperAdmin(userRole) && !isAdmin(userRole))) {
+      return NextResponse.json({ error: 'No autorizado. Se requiere nivel Admin o Super Admin.' }, { status: 403 })
     }
 
     const body = await req.json()
@@ -39,6 +45,15 @@ export async function POST(req: NextRequest) {
     
     await connectDB()
     
+    // Verificar permisos de creación de roles
+    // SUPER_ADMIN puede crear ADMIN, SUPERVISOR, PHARMACY
+    // ADMIN puede crear SUPERVISOR, PHARMACY (NO ADMIN ni SUPER_ADMIN)
+    if (!isSuperAdmin(userRole)) {
+      if (validated.role === UserRole.ADMIN || validated.role === UserRole.SUPER_ADMIN) {
+        return NextResponse.json({ error: 'No tienes permisos para crear rol ' + validated.role }, { status: 403 })
+      }
+    }
+
     // Verificar si el email ya existe
     const existingUser = await User.findOne({ email: validated.email })
     if (existingUser) {
@@ -65,6 +80,7 @@ export async function POST(req: NextRequest) {
       pharmacyName: validated.pharmacyName,
       pharmacyCode: validated.pharmacyCode,
       phone: validated.phone,
+      assignedPharmacies: validated.assignedPharmacies || [],
       isActive: true,
     })
 
@@ -78,6 +94,7 @@ export async function POST(req: NextRequest) {
         pharmacyName: user.pharmacyName,
         pharmacyCode: user.pharmacyCode,
         phone: user.phone,
+        assignedPharmacies: user.assignedPharmacies,
         isActive: user.isActive,
       },
     }, { status: 201 })

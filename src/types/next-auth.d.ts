@@ -17,6 +17,7 @@ declare module 'next-auth' {
       pharmacyName?: string
       pharmacyCode?: string
       profileImage?: string
+      assignedPharmacies?: string[]
     }
   }
 
@@ -26,6 +27,7 @@ declare module 'next-auth' {
     pharmacyName?: string
     pharmacyCode?: string
     profileImage?: string
+    assignedPharmacies?: string[]
   }
 }
 
@@ -36,5 +38,6 @@ declare module 'next-auth/jwt' {
     pharmacyName?: string
     pharmacyCode?: string
     profileImage?: string
+    assignedPharmacies?: string[]
   }
 }

@@ -67,13 +67,29 @@ export async function GET(req: NextRequest) {
 
     await connectDB()
 
-    let query = {}
+    let query: Record<string, unknown> = {}
+    const userRole = session.user.role as UserRole
+    const userId = session.user.id
     
     // Si es FARMACIA, solo ve sus propios pedidos
-    if (session.user.role === UserRole.PHARMACY) {
-      query = { pharmacy: session.user.id }
+    if (userRole === UserRole.PHARMACY) {
+      query = { pharmacy: userId }
     }
-    // Si es ADMIN, ve todos (o puede filtrar por farmacia si luego lo agregamos)
+    // Si es SUPERVISOR, solo ve pedidos de farmacias asignadas
+    else if (userRole === UserRole.SUPERVISOR) {
+      const assignedPharmacies = (session.user as any).assignedPharmacies || []
+      if (assignedPharmacies.length > 0) {
+        const { default: User } = await import('@/models/User')
+        const assignedUsers = await User.find({ 
+          pharmacyCode: { $in: assignedPharmacies } 
+        }).select('_id')
+        const pharmacyIds = assignedUsers.map(u => u._id)
+        query = { pharmacy: { $in: pharmacyIds } }
+      } else {
+        query = { pharmacy: null }
+      }
+    }
+    // Si es ADMIN o SUPER_ADMIN, ve todos los pedidos
 
     const requests = await SupplyRequest.find(query)
       .sort({ createdAt: -1 })
@@ -81,6 +97,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(requests)
   } catch (error) {
+    console.error('API_SUPPLIES_GET_ERROR:', error)
     return NextResponse.json(
       { error: 'Error al obtener los suministros' },
       { status: 500 }

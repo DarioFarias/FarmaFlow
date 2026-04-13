@@ -20,3 +20,10 @@ export function isSuperAdmin(role?: UserRole): boolean {
 export function isPharmacy(role?: UserRole): boolean {
   return role === UserRole.PHARMACY
 }
+
+/**
+ * Verifica si un rol es Supervisor (acceso limitado a assignedPharmacies)
+ */
+export function isSupervisor(role?: UserRole): boolean {
+  return role === UserRole.SUPERVISOR
+}

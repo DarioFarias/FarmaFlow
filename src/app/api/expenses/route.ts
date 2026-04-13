@@ -60,14 +60,34 @@ export async function GET(req: NextRequest) {
     await connectDB()
 
     let query = {}
-    if (session.user.role === UserRole.PHARMACY) {
-      query = { pharmacy: session.user.id }
+    const userRole = session.user.role as UserRole
+    const userId = session.user.id
+    
+    // Si es FARMACIA, solo ve sus propios gastos
+    if (userRole === UserRole.PHARMACY) {
+      query = { pharmacy: userId }
     }
+    // Si es SUPERVISOR, solo ve gastos de farmacias asignadas
+    else if (userRole === UserRole.SUPERVISOR) {
+      const assignedPharmacies = (session.user as any).assignedPharmacies || []
+      if (assignedPharmacies.length > 0) {
+        const { default: User } = await import('@/models/User')
+        const assignedUsers = await User.find({ 
+          pharmacyCode: { $in: assignedPharmacies } 
+        }).select('_id')
+        const pharmacyIds = assignedUsers.map(u => u._id)
+        query = { pharmacy: { $in: pharmacyIds } }
+      } else {
+        query = { pharmacy: null }
+      }
+    }
+    // Si es ADMIN o SUPER_ADMIN, ve todos los gastos
 
     const expenses = await Expense.find(query).sort({ createdAt: -1 })
 
     return NextResponse.json(expenses)
   } catch (error) {
+    console.error('API_EXPENSES_GET_ERROR:', error)
     return NextResponse.json(
       { error: 'Error al obtener los gastos' },
       { status: 500 }

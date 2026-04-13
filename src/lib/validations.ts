@@ -22,23 +22,24 @@ export const createUserSchema = z.object({
   name: z.string().min(2).max(100).trim(),
   email: z.string().email().toLowerCase().trim(),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
-  role: z.enum(['ADMIN', 'PHARMACY']).default('PHARMACY'),
+  role: z.enum(['ADMIN', 'SUPERVISOR', 'PHARMACY']).default('PHARMACY'),
   pharmacyName: z.string().min(1, 'El nombre de sucursal es requerido').max(100).trim().optional(),
   pharmacyCode: z.string().max(20).trim().optional(),
   phone: z.string().max(30).trim().optional(),
 })
 
-// Schema para Super Admin - puede crear usuarios ADMIN o PHARMACY
+// Schema para Super Admin - puede crear ADMIN, SUPERVISOR, PHARMACY
 export const adminCreateUserSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100).trim(),
   email: z.string().email('Email inválido').toLowerCase().trim(),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
-  role: z.enum(['ADMIN', 'PHARMACY'], {
-    errorMap: () => ({ message: 'El rol debe ser ADMIN o PHARMACY' }),
+  role: z.enum(['ADMIN', 'SUPERVISOR', 'PHARMACY', 'SUPER_ADMIN'], {
+    errorMap: () => ({ message: 'Rol inválido' }),
   }),
   pharmacyName: z.string().max(100).trim().optional(),
   pharmacyCode: z.string().max(20).trim().optional(),
   phone: z.string().max(30).trim().optional(),
+  assignedPharmacies: z.array(z.string()).default([]),
 }).refine((data) => {
   // Si es PHARMACY, pharmacyName es requerido
   if (data.role === 'PHARMACY') {
@@ -54,10 +55,11 @@ export const adminCreateUserSchema = z.object({
 export const adminUpdateUserSchema = z.object({
   name: z.string().min(2).max(100).trim().optional(),
   email: z.string().email().toLowerCase().trim().optional(),
-  role: z.enum(['ADMIN', 'PHARMACY']).optional(),
+  role: z.enum(['ADMIN', 'SUPERVISOR', 'PHARMACY', 'SUPER_ADMIN']).optional(),
   pharmacyName: z.string().max(100).trim().optional(),
   pharmacyCode: z.string().max(20).trim().optional(),
   phone: z.string().max(30).trim().optional(),
+  assignedPharmacies: z.array(z.string()).optional(),
   isActive: z.boolean().optional(),
 })
 
