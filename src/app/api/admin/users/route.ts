@@ -82,15 +82,19 @@ export async function POST(req: NextRequest) {
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(validated.password, 12)
 
+    // Limpiar campos vacíos (convertir "" a undefined para que Mongoose no guarde)
+    const pharmacyCode = validated.pharmacyCode || undefined
+    const pharmacyName = validated.pharmacyName || undefined
+
     // Crear usuario
     const user = await User.create({
       name: validated.name,
       email: validated.email,
       password: hashedPassword,
       role: validated.role as UserRole,
-      pharmacyName: validated.pharmacyName,
-      pharmacyCode: validated.pharmacyCode,
-      phone: validated.phone,
+      pharmacyName,
+      pharmacyCode,
+      phone: validated.phone || undefined,
       assignedPharmacies: validated.assignedPharmacies || [],
       isActive: true,
     })
