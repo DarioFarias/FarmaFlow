@@ -5,7 +5,8 @@ import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import { isSuperAdmin } from '@/lib/roles'
 import { UserRole } from '@/types'
-import bcrypt from 'bcryptjs'
+import { adminUpdateUserSchema } from '@/lib/validations'
+import { z } from 'zod'
 
 export async function PATCH(
   req: NextRequest,
@@ -20,6 +21,9 @@ export async function PATCH(
     const body = await req.json()
     const { id } = params
 
+    // Validar con Zod
+    const validated = adminUpdateUserSchema.parse(body)
+
     await connectDB()
     const user = await User.findById(id)
 
@@ -27,22 +31,67 @@ export async function PATCH(
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
     }
 
-    // Campos permitidos para edición por SA
-    if (body.name) user.name = body.name
-    if (body.role) user.role = body.role as UserRole
-    if (body.isActive !== undefined) user.isActive = body.isActive
-    if (body.pharmacyName) user.pharmacyName = body.pharmacyName
-    if (body.pharmacyCode) user.pharmacyCode = body.pharmacyCode
-    
-    // Reset de password por SA (opcional)
-    if (body.password) {
-      user.password = await bcrypt.hash(body.password, 12)
+    // Actualizar campos
+    if (validated.name !== undefined) user.name = validated.name
+    if (validated.email !== undefined) {
+      // Verificar que el nuevo email no esté en uso por otro usuario
+      const existingEmail = await User.findOne({ email: validated.email, _id: { $ne: id } })
+      if (existingEmail) {
+        return NextResponse.json({ error: 'El email ya está en uso por otro usuario' }, { status: 400 })
+      }
+      user.email = validated.email
     }
+    if (validated.role !== undefined) user.role = validated.role as UserRole
+    if (validated.pharmacyName !== undefined) user.pharmacyName = validated.pharmacyName
+    if (validated.pharmacyCode !== undefined) {
+      // Verificar pharmacyCode único
+      const existingCode = await User.findOne({ pharmacyCode: validated.pharmacyCode, _id: { $ne: id } })
+      if (existingCode) {
+        return NextResponse.json({ error: 'El código de sucursal ya está en uso' }, { status: 400 })
+      }
+      user.pharmacyCode = validated.pharmacyCode
+    }
+    if (validated.phone !== undefined) user.phone = validated.phone
+    if (validated.isActive !== undefined) user.isActive = validated.isActive
 
     await user.save()
 
     return NextResponse.json({ message: 'Usuario actualizado correctamente' })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.errors[0].message }, { status: 400 })
+    }
+    console.error('Error updating user:', error)
     return NextResponse.json({ error: 'Error al actualizar usuario' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    }
+
+    const { id } = params
+
+    await connectDB()
+    const user = await User.findById(id)
+
+    if (!user) {
+      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+    }
+
+    // Soft delete: marcar como inactivo
+    user.isActive = false
+    await user.save()
+
+    return NextResponse.json({ message: 'Usuario eliminado correctamente' })
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    return NextResponse.json({ error: 'Error al eliminar usuario' }, { status: 500 })
   }
 }

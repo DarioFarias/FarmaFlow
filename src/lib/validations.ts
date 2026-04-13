@@ -31,6 +31,50 @@ export const createUserSchema = z.object({
   phone: z.string().optional(),
 })
 
+// Schema para Super Admin - puede crear usuarios ADMIN o PHARMACY
+export const adminCreateUserSchema = z.object({
+  name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100).trim(),
+  email: z.string().email('Email inválido').toLowerCase().trim(),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  role: z.enum(['ADMIN', 'PHARMACY'], {
+    errorMap: () => ({ message: 'El rol debe ser ADMIN o PHARMACY' }),
+  }),
+  pharmacyName: z.string().max(100).trim().optional(),
+  pharmacyCode: z
+    .string()
+    .regex(/^FAR-\d{3}$/, 'El código debe tener formato FAR-001')
+    .optional(),
+  phone: z.string().optional(),
+}).refine((data) => {
+  // Si es PHARMACY, pharmacyName es requerido
+  if (data.role === 'PHARMACY') {
+    return !!data.pharmacyName && data.pharmacyName.length > 0
+  }
+  return true
+}, {
+  message: 'El nombre de sucursal es requerido para rol PHARMACY',
+  path: ['pharmacyName'],
+})
+
+// Schema para actualizar usuario por Super Admin
+export const adminUpdateUserSchema = z.object({
+  name: z.string().min(2).max(100).trim().optional(),
+  email: z.string().email().toLowerCase().trim().optional(),
+  role: z.enum(['ADMIN', 'PHARMACY']).optional(),
+  pharmacyName: z.string().max(100).trim().optional(),
+  pharmacyCode: z
+    .string()
+    .regex(/^FAR-\d{3}$/, 'El código debe tener formato FAR-001')
+    .optional(),
+  phone: z.string().optional(),
+  isActive: z.boolean().optional(),
+})
+
+// Schema para cambiar contraseña por Super Admin
+export const adminChangePasswordSchema = z.object({
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+})
+
 // ---- SUMINISTROS ----
 
 export const supplyItemSchema = z.object({
@@ -78,6 +122,9 @@ export const updateExpenseStatusSchema = z.object({
 // ---- Tipos inferidos desde Zod ----
 export type LoginInput = z.infer<typeof loginSchema>
 export type CreateUserInput = z.infer<typeof createUserSchema>
+export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>
+export type AdminUpdateUserInput = z.infer<typeof adminUpdateUserSchema>
+export type AdminChangePasswordInput = z.infer<typeof adminChangePasswordSchema>
 export type CreateSupplyRequestInput = z.infer<typeof createSupplyRequestSchema>
 export type UpdateSupplyStatusInput = z.infer<typeof updateSupplyStatusSchema>
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>
