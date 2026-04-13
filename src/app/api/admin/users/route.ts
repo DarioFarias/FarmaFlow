@@ -48,9 +48,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
+    console.log('POST /api/admin/users - body:', JSON.stringify(body))
     
     // Validar datos con Zod
     const validated = adminCreateUserSchema.parse(body)
+    console.log('POST /api/admin/users - validated:', JSON.stringify(validated))
     
     await connectDB()
     
@@ -109,9 +111,10 @@ export async function POST(req: NextRequest) {
     }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors[0].message }, { status: 400 })
+      const errorMessages = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
+      return NextResponse.json({ error: errorMessages }, { status: 400 })
     }
     console.error('Error creating user:', error)
-    return NextResponse.json({ error: 'Error al crear usuario' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al crear usuario: ' + (error as Error).message }, { status: 500 })
   }
 }
