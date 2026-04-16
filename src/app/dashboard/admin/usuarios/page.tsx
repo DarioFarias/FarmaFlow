@@ -158,9 +158,9 @@ export default function UsuariosAdminPage() {
   // Edit user handlers
   const openEditModal = (user: IUser) => {
     setSelectedUser(user)
-    setFormData({
+setFormData({
       name: user.name,
-      email: user.email,
+      email: user.email || '',
       password: '',
       role: user.role as 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR',
       phone: user.phone || '',

@@ -16,14 +16,23 @@ const UserSchema = new Schema<IUserDocument>(
     },
     email: {
       type: String,
-      required: [true, 'El email es obligatorio'],
       unique: true,
       lowercase: true,
       trim: true,
+      sparse: true, // Permite null sin violar unique
       match: [
         /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
         'Por favor ingrese un email válido',
       ],
+    },
+    username: {
+      type: String,
+      required: [true, 'El nombre de usuario es obligatorio'],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      minlength: [3, 'El username debe tener al menos 3 caracteres'],
+      maxlength: [30, 'El username no puede superar 30 caracteres'],
     },
     password: {
       type: String,

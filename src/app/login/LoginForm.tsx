@@ -10,7 +10,7 @@ import { toast } from 'react-hot-toast'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
 
 const loginSchema = z.object({
-  email: z.string().email('Ingresa un email válido'),
+  username: z.string().min(3, 'El username debe tener al menos 3 caracteres'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
 })
 
@@ -37,7 +37,7 @@ export function LoginForm() {
     
     try {
       const result = await signIn('credentials', {
-        email: data.email.toLowerCase(),
+        username: data.username.toLowerCase(),
         password: data.password,
         redirect: false,
       })
@@ -45,7 +45,7 @@ export function LoginForm() {
       if (result?.error) {
         // Error de NextAuth: CredentialsSignin indica credenciales inválidas
         if (result.error === 'CredentialsSignin') {
-          toast.error('Credenciales incorrectas. Verifica tu email y contraseña.')
+          toast.error('Credenciales incorrectas. Verifica tu usuario y contraseña.')
         } else {
           toast.error('Error al iniciar sesión. Intenta de nuevo.')
         }
@@ -67,19 +67,19 @@ export function LoginForm() {
       
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div>
-          <label htmlFor="email" className="label text-gray-700 font-medium">
-            Correo electrónico
+          <label htmlFor="username" className="label text-gray-700 font-medium">
+            Nombre de usuario
           </label>
           <input
-            {...register('email')}
-            id="email"
-            type="email"
-            placeholder="supervisor@farmacia.com"
+            {...register('username')}
+            id="username"
+            type="text"
+            placeholder="usuario123"
             disabled={isLoading}
-            className={`input ${errors.email ? 'border-red-500 focus:ring-red-500' : ''}`}
+            className={`input ${errors.username ? 'border-red-500 focus:ring-red-500' : ''}`}
           />
-          {errors.email && (
-            <p className="mt-1 text-xs text-red-500 italic">{errors.email.message}</p>
+          {errors.username && (
+            <p className="mt-1 text-xs text-red-500 italic">{errors.username.message}</p>
           )}
         </div>
 

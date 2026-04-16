@@ -14,12 +14,12 @@ const ExpenseSchema = new Schema<IExpenseDocument>(
     },
     pharmacy: {
       type: Schema.Types.ObjectId as any,
-      ref: 'User',
+      ref: 'Pharmacy',
       required: [true, 'La referencia a la farmacia es obligatoria'],
     },
     pharmacyName: {
       type: String,
-      required: [true, 'El nombre de farmacia es obligatorio'],
+      required: [true, 'El nombre de la farmacia es obligatorio'],
       trim: true,
     },
     amount: {
@@ -29,7 +29,7 @@ const ExpenseSchema = new Schema<IExpenseDocument>(
     },
     currency: {
       type: String,
-      default: 'ARS',
+      default: 'MXN',
       uppercase: true,
       trim: true,
     },

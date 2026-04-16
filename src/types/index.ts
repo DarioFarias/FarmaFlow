@@ -77,7 +77,8 @@ export interface IPharmacy {
 export interface IUser {
   _id: string
   name: string
-  email: string
+  email?: string          // Opcional - usuario puede registrarse sin email
+  username: string           // Identificador único de usuario (min 3, max 30 caracteres)
   password: string          // Almacenado como hash bcrypt
   role: UserRole
   phone?: string
@@ -119,7 +120,7 @@ export interface IStatusHistoryEvent {
 export interface ISupplyRequest {
   _id: string
   requestNumber: string     // Auto-generado: "REQ-2024-001"
-  pharmacy: string          // User ID de la farmacia solicitante
+  pharmacy: string          // Pharmacy ID (ref a Pharmacy)
   pharmacyName: string      // Denormalizado para queries rápidas
   items: ISupplyItem[]
   status: SupplyRequestStatus
@@ -140,10 +141,10 @@ export interface ISupplyRequest {
 export interface IExpense {
   _id: string
   expenseNumber: string     // Auto-generado: "EXP-2024-001"
-  pharmacy: string          // User ID de la farmacia
+  pharmacy: string          // Pharmacy ID (ref a Pharmacy)
   pharmacyName: string      // Denormalizado
   amount: number            // Monto en moneda local
-  currency: string          // 'ARS', 'USD', etc.
+  currency: string          // 'MXN', 'USD', etc.
   category: ExpenseCategory
   description: string       // Descripción del gasto
   vendor?: string           // Proveedor / local donde se realizó

@@ -24,21 +24,31 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        username: { label: 'Usuario', type: 'text' },
         password: { label: 'Contraseña', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        if (!credentials?.username || !credentials?.password) {
           return null
         }
 
         await connectDB()
 
-        // Se usa .select('+password') porque el campo tiene select: false
-        const user = await User.findOne({
-          email: credentials.email.toLowerCase(),
+        const input = credentials.username.toLowerCase().trim()
+
+        // 1. Buscar por username primero
+        let user = await User.findOne({
+          username: input,
           isActive: true,
-        }).select('+password')
+        }).select('+password').lean() as any
+
+        // 2. Fallback: buscar por email (para usuarios legacy sin username)
+        if (!user) {
+          user = await User.findOne({
+            email: input,
+            isActive: true,
+          }).select('+password').lean() as any
+        }
 
         if (!user) {
           return null
@@ -57,6 +67,7 @@ export const authOptions: NextAuthOptions = {
           id: user._id.toString(),
           name: user.name,
           email: user.email,
+          username: user.username || null, // null para usuarios legacy
           role: user.role,
           profileImage: user.profileImage,
           assignedPharmacies: user.assignedPharmacies || [],
@@ -72,6 +83,7 @@ export const authOptions: NextAuthOptions = {
         token.role = (user as { role: UserRole }).role
         token.profileImage = (user as any).profileImage
         token.assignedPharmacies = (user as any).assignedPharmacies || []
+        token.username = (user as any).username || null // null para usuarios legacy
       }
       return token
     },
@@ -82,6 +94,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as UserRole
         session.user.profileImage = token.profileImage as string | undefined
         session.user.assignedPharmacies = token.assignedPharmacies as string[] | undefined
+        session.user.username = token.username as string | null | undefined
       }
       return session
     },

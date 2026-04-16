@@ -79,7 +79,7 @@ const SupplyRequestSchema = new Schema<ISupplyRequestDocument>(
     },
     pharmacy: {
       type: Schema.Types.ObjectId as any,
-      ref: 'User',
+      ref: 'Pharmacy',
       required: [true, 'La referencia a la farmacia es obligatoria'],
     },
     pharmacyName: {
