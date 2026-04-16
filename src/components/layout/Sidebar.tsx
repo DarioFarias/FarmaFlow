@@ -8,15 +8,20 @@ import clsx from 'clsx'
 
 interface SidebarProps {
   role: UserRole
-  pharmacyName?: string
+  assignedPharmacies?: string[]
   isOpen: boolean
   setIsOpen: (val: boolean) => void
   profileImage?: string
 }
 
-export function Sidebar({ role, pharmacyName, isOpen, setIsOpen, profileImage }: SidebarProps) {
+export function Sidebar({ role, assignedPharmacies, isOpen, setIsOpen, profileImage }: SidebarProps) {
   const pathname = usePathname()
   const isAdmin = role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN
+  
+  // Mostrar el código de la primera farmacia asignada o "Mi Farmacia"
+  const pharmacyLabel = assignedPharmacies && assignedPharmacies.length > 0 
+    ? assignedPharmacies[0] 
+    : 'Mi Farmacia'
 
   const navItems = isAdmin
     ? [
@@ -72,7 +77,7 @@ export function Sidebar({ role, pharmacyName, isOpen, setIsOpen, profileImage }:
           <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
             <div className="mb-4 px-2">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                {isAdmin ? 'Administración' : pharmacyName || 'Mi Farmacia'}
+                {isAdmin ? 'Administración' : pharmacyLabel}
               </p>
             </div>
             

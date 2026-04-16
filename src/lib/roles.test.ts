@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isAdmin, isPharmacy, isSuperAdmin } from './roles'
+import { isAdmin, isSuperAdmin, isSupervisor } from './roles'
 import { UserRole } from '../types'
 
 describe('Roles Helpers', () => {
@@ -12,8 +12,8 @@ describe('Roles Helpers', () => {
       expect(isAdmin(UserRole.SUPER_ADMIN)).toBe(true)
     })
 
-    it('returns false for PHARMACY role', () => {
-      expect(isAdmin(UserRole.PHARMACY)).toBe(false)
+    it('returns false for SUPERVISOR role', () => {
+      expect(isAdmin(UserRole.SUPERVISOR)).toBe(false)
     })
 
     it('returns false for undefined', () => {
@@ -30,8 +30,8 @@ describe('Roles Helpers', () => {
       expect(isSuperAdmin(UserRole.ADMIN)).toBe(false)
     })
 
-    it('returns false for PHARMACY role', () => {
-      expect(isSuperAdmin(UserRole.PHARMACY)).toBe(false)
+    it('returns false for SUPERVISOR role', () => {
+      expect(isSuperAdmin(UserRole.SUPERVISOR)).toBe(false)
     })
 
     it('returns false for undefined', () => {
@@ -39,21 +39,21 @@ describe('Roles Helpers', () => {
     })
   })
 
-  describe('isPharmacy', () => {
-    it('returns true for PHARMACY role', () => {
-      expect(isPharmacy(UserRole.PHARMACY)).toBe(true)
+  describe('isSupervisor', () => {
+    it('returns true for SUPERVISOR role', () => {
+      expect(isSupervisor(UserRole.SUPERVISOR)).toBe(true)
     })
 
     it('returns false for ADMIN role', () => {
-      expect(isPharmacy(UserRole.ADMIN)).toBe(false)
+      expect(isSupervisor(UserRole.ADMIN)).toBe(false)
     })
 
     it('returns false for SUPER_ADMIN role', () => {
-      expect(isPharmacy(UserRole.SUPER_ADMIN)).toBe(false)
+      expect(isSupervisor(UserRole.SUPER_ADMIN)).toBe(false)
     })
 
     it('returns false for undefined', () => {
-      expect(isPharmacy(undefined)).toBe(false)
+      expect(isSupervisor(undefined)).toBe(false)
     })
   })
 })

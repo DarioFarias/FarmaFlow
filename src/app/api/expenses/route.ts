@@ -31,7 +31,21 @@ export async function POST(req: NextRequest) {
 
     await connectDB()
 
-    const pharmacyName = session.user.pharmacyName || session.user.name
+    // Obtener nombre de farmacia desde la colección Pharmacy usando assignedPharmacies
+    let pharmacyName = 'Farmacia'
+    const assignedPharmacies = (session.user as any).assignedPharmacies || []
+    if (assignedPharmacies.length > 0) {
+      const { default: Pharmacy } = await import('@/models/Pharmacy')
+      const pharmacyDoc = await Pharmacy.findOne({ 
+        pharmacyCode: assignedPharmacies[0]
+      }).select('pharmacyName')
+      if (pharmacyDoc) {
+        pharmacyName = pharmacyDoc.pharmacyName
+      }
+    } else {
+      // Si no tiene farmacias asignadas, usar el nombre del usuario
+      pharmacyName = session.user.name || 'Farmacia'
+    }
 
     const newExpense = await Expense.create({
       ...validation.data,
@@ -63,25 +77,25 @@ export async function GET(req: NextRequest) {
     const userRole = session.user.role as UserRole
     const userId = session.user.id
     
-    // Si es FARMACIA, solo ve sus propios gastos
-    if (userRole === UserRole.PHARMACY) {
-      query = { pharmacy: userId }
-    }
-    // Si es SUPERVISOR, solo ve gastos de farmacias asignadas
-    else if (userRole === UserRole.SUPERVISOR) {
+    // Nota: El rol PHARMACY fue movido a colección Pharmacy
+    // Ahora los usuarios normales ven sus propios gastos
+    // Los SUPERVISOR ven los gastos de farmacias asignadas
+    if (userRole === UserRole.SUPERVISOR) {
       const assignedPharmacies = (session.user as any).assignedPharmacies || []
       if (assignedPharmacies.length > 0) {
-        const { default: User } = await import('@/models/User')
-        const assignedUsers = await User.find({ 
-          pharmacyCode: { $in: assignedPharmacies } 
+        // Filtar por pharmacyCode en la colección Pharmacy (no en User)
+        const { default: Pharmacy } = await import('@/models/Pharmacy')
+        const assignedPharmaciesDocs = await Pharmacy.find({ 
+          pharmacyCode: { $in: assignedPharmacies },
+          isActive: true
         }).select('_id')
-        const pharmacyIds = assignedUsers.map(u => u._id)
+        const pharmacyIds = assignedPharmaciesDocs.map(p => p._id)
         query = { pharmacy: { $in: pharmacyIds } }
       } else {
         query = { pharmacy: null }
       }
     }
-    // Si es ADMIN o SUPER_ADMIN, ve todos los gastos
+    // ADMIN y SUPER_ADMIN ven todos los gastos
 
     const expenses = await Expense.find(query).sort({ createdAt: -1 })
 

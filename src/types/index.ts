@@ -10,7 +10,7 @@ export enum UserRole {
   SUPER_ADMIN = 'SUPER_ADMIN', // Acceso total a todas las farmacias
   ADMIN = 'ADMIN',             // Acceso total a todas las farmacias
   SUPERVISOR = 'SUPERVISOR',   // Acceso limitado a assignedPharmacies
-  PHARMACY = 'PHARMACY',       // Solo pedidos propios
+  // PHARMACY fue movido a colección Pharmacy - ya no es un rol de usuario
 }
 
 // ---- MÁQUINA DE ESTADOS: REQUERIMIENTOS DE SUMINISTROS ----
@@ -59,6 +59,20 @@ export enum ExpenseCategory {
 // INTERFACES DE DOMINIO
 // =============================================
 
+// ---- FARMACIA (Entidad independiente del usuario) ----
+
+export interface IPharmacy {
+  _id: string
+  pharmacyCode: string      // Código único: "FAR-001"
+  pharmacyName: string      // Nombre del establecimiento
+  address?: string        // Dirección física
+  phone?: string          // Teléfono de contacto
+  email?: string          // Email de contacto
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
 // ---- USUARIO ----
 
 export interface IUser {
@@ -67,13 +81,14 @@ export interface IUser {
   email: string
   password: string          // Almacenado como hash bcrypt
   role: UserRole
-  pharmacyName?: string     // Nombre de sucursal (solo rol PHARMACY)
-  pharmacyCode?: string     // Código único de sucursal ej: "FAR-001"
   phone?: string
   isActive: boolean
   profileImage?: string     // URL de Cloudinary
   profileImagePublicId?: string // ID de Cloudinary para gestión
-  assignedPharmacies?: string[] // Códigos de farmacia asignados (solo rol SUPERVISOR)
+  assignedPharmacies?: string[] // Códigos de farmacia asignados (SUPERVISOR, ADMIN, ENCARGADO, etc.)
+  // Campos legacy de backwards compatibility - migrados a colección Pharmacy
+  pharmacyName?: string
+  pharmacyCode?: string
   createdAt: Date
   updatedAt: Date
 }

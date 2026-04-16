@@ -4,11 +4,12 @@ import connectDB from '@/lib/mongodb'
 import SupplyRequest from '@/models/SupplyRequest'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { UserRole, SupplyRequestStatus } from '@/types'
+import { UserRole, SupplyRequestStatus, IPharmacy } from '@/types'
 import { isAdmin } from '@/lib/roles'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { AuditActions } from '@/components/audit/AuditActions'
+import Pharmacy from '@/models/Pharmacy'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,8 +26,22 @@ export default async function SuministrosPage() {
   await connectDB()
 
   let query = {}
-  if (session?.user.role === UserRole.PHARMACY) {
-    query = { pharmacy: session.user.id }
+  if (session?.user) {
+    const userRole = session.user.role as UserRole
+    const isUserAdmin = isAdmin(userRole)
+    
+    if (!isUserAdmin) {
+      // No-admin: filtrar por assignedPharmacies
+      const assignedPharmacies = (session.user as any).assignedPharmacies || []
+      if (assignedPharmacies.length > 0) {
+        // Obtener los IDs de las farmacias asignadas
+        const pharmacies = await Pharmacy.find({ pharmacyCode: { $in: assignedPharmacies } }).select('_id')
+        const pharmacyIds = pharmacies.map(p => p._id)
+        query = { pharmacy: { $in: pharmacyIds } }
+      } else {
+        query = { pharmacy: null } // No tiene farmacias asignadas
+      }
+    }
   }
 
   const pedidos = await SupplyRequest.find(query).sort({ createdAt: -1 })

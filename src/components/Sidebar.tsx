@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { UserRole } from '@/types'
 import clsx from 'clsx'
+import { isAdmin } from '@/lib/roles'
 
 // =============================================
 // FARMAFLOW - Sidebar (desktop) / Bottom-nav (mobile)
@@ -32,25 +33,25 @@ const navItems: NavItem[] = [
     href: '/dashboard',
     label: 'Inicio',
     icon: LayoutDashboard,
-    roles: [UserRole.ADMIN, UserRole.PHARMACY],
+    roles: [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.SUPER_ADMIN],
   },
   {
     href: '/dashboard/suministros',
     label: 'Suministros',
     icon: Package,
-    roles: [UserRole.ADMIN, UserRole.PHARMACY],
+    roles: [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.SUPER_ADMIN],
   },
   {
     href: '/dashboard/gastos',
     label: 'Gastos',
     icon: Receipt,
-    roles: [UserRole.ADMIN, UserRole.PHARMACY],
+    roles: [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.SUPER_ADMIN],
   },
   {
     href: '/dashboard/farmacias',
     label: 'Farmacias',
     icon: Users,
-    roles: [UserRole.ADMIN],
+    roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN],
   },
 ]
 
@@ -106,8 +107,13 @@ export function Sidebar() {
               {session?.user?.name}
             </p>
             <p className="text-xs text-gray-500 truncate">
-              {session?.user?.pharmacyName ??
-                (role === UserRole.ADMIN ? 'Supervisor' : '')}
+              {role === UserRole.SUPER_ADMIN 
+                ? 'Super Admin' 
+                : role === UserRole.ADMIN 
+                  ? 'Supervisor' 
+                  : role === UserRole.SUPERVISOR 
+                    ? 'Encargado' 
+                    : ''}
             </p>
           </div>
           <button

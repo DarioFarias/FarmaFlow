@@ -4,7 +4,7 @@ import { UserRole } from '@/types'
 import { Package, Receipt, Users, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
+import Pharmacy from '@/models/Pharmacy'
 // import SupplyRequest from '@/models/SupplyRequest'
 // import Expense from '@/models/Expense'
 
@@ -16,8 +16,8 @@ export default async function DashboardPage() {
 
   await connectDB()
 
-  // Conteo real si es Admin
-  const farmaciasCount = isAdmin ? await User.countDocuments({ role: UserRole.PHARMACY, isActive: true }) : 0
+  // Conteo real si es Admin - contar de la colección Pharmacy
+  const farmaciasCount = isAdmin ? await Pharmacy.countDocuments({ isActive: true }) : 0
   
   // Próximamente traeremos esto de la DB
   const activeSupplyCount = 0

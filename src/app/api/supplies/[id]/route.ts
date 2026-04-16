@@ -23,8 +23,11 @@ export async function GET(
       return NextResponse.json({ error: 'Pedido no encontrado' }, { status: 404 })
     }
 
-    // Seguridad básica: farmacias solo ven sus propios pedidos
-    if (session.user.role === UserRole.PHARMACY && supplyRequest.pharmacy.toString() !== session.user.id) {
+    // Seguridad básica: solo admins pueden ver cualquier pedido
+    // Otros roles solo ven sus propios pedidos
+    const isAdminRole = (role: UserRole) => role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN || role === UserRole.SUPERVISOR
+    
+    if (!isAdminRole(session.user.role as UserRole) && supplyRequest.pharmacy.toString() !== session.user.id) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 

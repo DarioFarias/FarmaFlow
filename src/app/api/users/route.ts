@@ -4,13 +4,15 @@ import bcrypt from 'bcryptjs'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
-import { createUserSchema } from '@/lib/validations'
 import { UserRole } from '@/types'
 import { isAdmin } from '@/lib/roles'
+import { z } from 'zod'
 
 // =============================================
 // API Route: POST /api/users
-// Crea una nueva farmacia (solo ADMIN)
+// DEPRECATED: Este endpoint está en desuso
+// Las farmacias ahora se crean en /api/admin/pharmacies
+// Los usuarios se crean en /api/admin/users
 // =============================================
 
 export async function POST(req: NextRequest) {
@@ -25,9 +27,17 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 2. Parsear y validar body
+    // 2. Parsear y validar body (usando adminCreateUserSchema minimal)
     const body = await req.json()
-    const validation = createUserSchema.safeParse(body)
+    
+    // Schema inline para crear usuario genérico
+    const userSchema = z.object({
+      name: z.string().min(2),
+      email: z.string().email(),
+      password: z.string().min(8),
+      phone: z.string().optional(),
+    })
+    const validation = userSchema.safeParse(body)
 
     if (!validation.success) {
       return NextResponse.json(
@@ -36,27 +46,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { name, email, password, pharmacyName, pharmacyCode, phone } = validation.data
+    const { name, email, password, phone } = validation.data
+    // NOTE: pharmacyName y pharmacyCode ya no se usan - las farmacias están en colección Pharmacy
 
     await connectDB()
 
-    // 3. Verificar duplicados (email y código)
+    // 3. Verificar duplicados (email)
     const existingEmail = await User.findOne({ email: email.toLowerCase() })
     if (existingEmail) {
       return NextResponse.json(
-        { error: 'El email ya está registrado en otra sucursal.' },
+        { error: 'El email ya está registrado en otro usuario.' },
         { status: 400 }
       )
-    }
-
-    if (pharmacyCode) {
-      const existingCode = await User.findOne({ pharmacyCode: pharmacyCode.toUpperCase() })
-      if (existingCode) {
-        return NextResponse.json(
-          { error: 'El código de farmacia ya está en uso.' },
-          { status: 400 }
-        )
-      }
     }
 
     // 4. Hashear password y crear usuario
@@ -66,9 +67,8 @@ export async function POST(req: NextRequest) {
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
-      role: UserRole.PHARMACY, // Siempre pharmacy desde este flujo
-      pharmacyName,
-      pharmacyCode: pharmacyCode?.toUpperCase(),
+      // NOTE: El rol ya no puede ser PHARMACY desde este endpoint - se usa SUPERVISOR o ADMIN
+      role: UserRole.SUPERVISOR, // Rol por defecto para este endpoint
       phone,
       isActive: true,
     })
@@ -76,12 +76,11 @@ export async function POST(req: NextRequest) {
     // 5. Retornar éxito (sin el password)
     return NextResponse.json(
       { 
-        message: 'Farmacia creada con éxito',
+        message: 'Usuario creado con éxito',
         user: {
           id: newUser._id,
           name: newUser.name,
           email: newUser.email,
-          pharmacyCode: newUser.pharmacyCode
         } 
       },
       { status: 201 }
@@ -90,13 +89,14 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('API_USERS_POST_ERROR:', error)
     return NextResponse.json(
-      { error: 'Error interno del servidor al crear la farmacia.' },
+      { error: 'Error interno del servidor al crear el usuario.' },
       { status: 500 }
     )
   }
 }
 
-// Opcional: GET /api/users para listar (también protegido)
+// Opcional: GET /api/users para listar usuarios (también protegido)
+// NOTE: Este endpoint lista usuarios, NO farmacias
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -105,10 +105,11 @@ export async function GET(req: NextRequest) {
     }
 
     await connectDB()
-    const users = await User.find({ role: UserRole.PHARMACY }).sort({ createdAt: -1 })
+    // NOTE: Ya no filtramos por PHARMACY - listamos todos los usuarios
+    const users = await User.find().sort({ createdAt: -1 })
     
     return NextResponse.json(users)
   } catch (error) {
-    return NextResponse.json({ error: 'Error al obtener farmacias' }, { status: 500 })
+    return NextResponse.json({ error: 'Error al obtener usuarios' }, { status: 500 })
   }
 }

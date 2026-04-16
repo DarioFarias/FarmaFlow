@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   loginSchema,
-  createUserSchema,
+  adminCreateUserSchema,
   createExpenseSchema,
   createSupplyRequestSchema,
   updateSupplyStatusSchema,
@@ -27,20 +27,8 @@ describe('Validations - Login', () => {
 })
 
 describe('Validations - Create User', () => {
-  it('validates valid pharmacy user', () => {
-    const result = createUserSchema.safeParse({
-      name: 'Farmacia Central',
-      email: 'central@farmaflow.com',
-      password: 'password123',
-      role: 'PHARMACY',
-      pharmacyName: 'Farmacia Central',
-      pharmacyCode: 'FAR-001',
-    })
-    expect(result.success).toBe(true)
-  })
-
   it('validates valid admin user', () => {
-    const result = createUserSchema.safeParse({
+    const result = adminCreateUserSchema.safeParse({
       name: 'Admin User',
       email: 'admin@farmaflow.com',
       password: 'password123',
@@ -49,8 +37,19 @@ describe('Validations - Create User', () => {
     expect(result.success).toBe(true)
   })
 
+  it('validates valid supervisor with assigned pharmacies', () => {
+    const result = adminCreateUserSchema.safeParse({
+      name: 'Supervisor Test',
+      email: 'supervisor@farmaflow.com',
+      password: 'password123',
+      role: 'SUPERVISOR',
+      assignedPharmacies: ['pharm-001', 'pharm-002'],
+    })
+    expect(result.success).toBe(true)
+  })
+
   it('rejects short password', () => {
-    const result = createUserSchema.safeParse({
+    const result = adminCreateUserSchema.safeParse({
       name: 'Test',
       email: 'test@example.com',
       password: 'short',
@@ -58,22 +57,23 @@ describe('Validations - Create User', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects invalid pharmacy code format', () => {
-    const result = createUserSchema.safeParse({
-      name: 'Farmacia',
+  it('rejects invalid role', () => {
+    const result = adminCreateUserSchema.safeParse({
+      name: 'Test',
       email: 'test@example.com',
       password: 'password123',
-      pharmacyCode: 'INVALID',
+      role: 'INVALID_ROLE',
     })
     expect(result.success).toBe(false)
   })
 
-  it('accepts valid pharmacy code format', () => {
-    const result = createUserSchema.safeParse({
-      name: 'Farmacia',
-      email: 'test@example.com',
+  it('accepts optional phone field', () => {
+    const result = adminCreateUserSchema.safeParse({
+      name: 'Admin User',
+      email: 'admin@farmaflow.com',
       password: 'password123',
-      pharmacyCode: 'FAR-001',
+      role: 'ADMIN',
+      phone: '+54 11 1234 5678',
     })
     expect(result.success).toBe(true)
   })

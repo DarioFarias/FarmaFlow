@@ -3,7 +3,7 @@ import { UserRole } from '@/types'
 
 // =============================================
 // Extensión de tipos NextAuth para TypeScript estricto
-// Agrega campos custom (role, pharmacyName, etc.) a Session y JWT
+// Agrega campos custom (role, profileImage, assignedPharmacies) a Session y JWT
 // =============================================
 
 declare module 'next-auth' {
@@ -14,8 +14,6 @@ declare module 'next-auth' {
       email?: string | null
       image?: string | null
       role: UserRole
-      pharmacyName?: string
-      pharmacyCode?: string
       profileImage?: string
       assignedPharmacies?: string[]
     }
@@ -24,8 +22,6 @@ declare module 'next-auth' {
   interface User {
     id: string
     role: UserRole
-    pharmacyName?: string
-    pharmacyCode?: string
     profileImage?: string
     assignedPharmacies?: string[]
   }
@@ -35,8 +31,6 @@ declare module 'next-auth/jwt' {
   interface JWT {
     id: string
     role: UserRole
-    pharmacyName?: string
-    pharmacyCode?: string
     profileImage?: string
     assignedPharmacies?: string[]
   }

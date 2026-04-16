@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
 
     await connectDB()
 
-    // El nombre de la farmacia viene de la sesión para evitar fraudes
-    const pharmacyName = session.user.pharmacyName || session.user.name
+    // El nombre de la farmacia viene de la sesión (retrocompatibilidad) o del nombre del usuario
+    const pharmacyName = (session.user as any).pharmacyName || session.user.name
 
     const newRequest = await SupplyRequest.create({
       ...validation.data,
@@ -71,19 +71,22 @@ export async function GET(req: NextRequest) {
     const userRole = session.user.role as UserRole
     const userId = session.user.id
     
-    // Si es FARMACIA, solo ve sus propios pedidos
-    if (userRole === UserRole.PHARMACY) {
+    // Si es rol legacy (antigua farmacia), solo ve sus propios pedidos
+    // PHARMACY ya no existe como enum, cualquier rol no-admin/supervisor es farmacia
+    if (userRole !== UserRole.ADMIN && userRole !== UserRole.SUPER_ADMIN && userRole !== UserRole.SUPERVISOR) {
       query = { pharmacy: userId }
     }
     // Si es SUPERVISOR, solo ve pedidos de farmacias asignadas
     else if (userRole === UserRole.SUPERVISOR) {
       const assignedPharmacies = (session.user as any).assignedPharmacies || []
       if (assignedPharmacies.length > 0) {
-        const { default: User } = await import('@/models/User')
-        const assignedUsers = await User.find({ 
-          pharmacyCode: { $in: assignedPharmacies } 
+        // Filtar por pharmacyCode en la colección Pharmacy (no en User)
+        const { default: Pharmacy } = await import('@/models/Pharmacy')
+        const assignedPharmaciesDocs = await Pharmacy.find({ 
+          pharmacyCode: { $in: assignedPharmacies },
+          isActive: true
         }).select('_id')
-        const pharmacyIds = assignedUsers.map(u => u._id)
+        const pharmacyIds = assignedPharmaciesDocs.map(p => p._id)
         query = { pharmacy: { $in: pharmacyIds } }
       } else {
         query = { pharmacy: null }

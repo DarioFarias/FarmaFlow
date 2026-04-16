@@ -27,10 +27,11 @@ export async function GET(
       return NextResponse.json<ApiResponse>({ success: false, error: 'Gasto no encontrado' }, { status: 404 })
     }
 
-    if (
-      session.user.role === UserRole.PHARMACY &&
-      expense.pharmacy.toString() !== session.user.id
-    ) {
+    // Solo admins/supervisor pueden ver cualquier gasto
+    // Otros roles solo ven sus propios gastos
+    const isAdminRole = (role: UserRole) => role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN || role === UserRole.SUPERVISOR
+    
+    if (!isAdminRole(session.user.role as UserRole) && expense.pharmacy.toString() !== session.user.id) {
       return NextResponse.json<ApiResponse>({ success: false, error: 'Acceso denegado' }, { status: 403 })
     }
 

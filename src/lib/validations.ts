@@ -11,6 +11,44 @@ import {
 // Fuente única para validación de API y formularios (client + server)
 // =============================================
 
+// ---- FARMACIAS ----
+
+export const pharmacyCreateSchema = z.object({
+  pharmacyCode: z.string()
+    .min(1, 'El código es requerido')
+    .max(20, 'Máximo 20 caracteres')
+    .trim()
+    .toUpperCase(),
+  pharmacyName: z.string()
+    .min(2, 'El nombre es requerido')
+    .max(100, 'Máximo 100 caracteres')
+    .trim(),
+  address: z.string().max(200).trim().optional(),
+  phone: z.string().max(30).trim().optional(),
+  email: z.string().email('Email inválido').toLowerCase().trim().optional(),
+})
+
+export const pharmacyUpdateSchema = z.object({
+  pharmacyCode: z.string()
+    .min(1)
+    .max(20)
+    .trim()
+    .toUpperCase()
+    .optional(),
+  pharmacyName: z.string()
+    .min(2)
+    .max(100)
+    .trim()
+    .optional(),
+  address: z.string().max(200).trim().optional(),
+  phone: z.string().max(30).trim().optional(),
+  email: z.string().email().toLowerCase().trim().optional(),
+  isActive: z.boolean().optional(),
+})
+
+export type PharmacyCreateInput = z.infer<typeof pharmacyCreateSchema>
+export type PharmacyUpdateInput = z.infer<typeof pharmacyUpdateSchema>
+
 // ---- USUARIOS ----
 
 export const loginSchema = z.object({
@@ -18,46 +56,24 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'La contraseña es requerida'),
 })
 
-export const createUserSchema = z.object({
-  name: z.string().min(2).max(100).trim(),
-  email: z.string().email().toLowerCase().trim(),
-  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
-  role: z.enum(['ADMIN', 'SUPERVISOR', 'PHARMACY']).default('PHARMACY'),
-  pharmacyName: z.string().min(1, 'El nombre de sucursal es requerido').max(100).trim().optional(),
-  pharmacyCode: z.string().max(20).trim().optional(),
-  phone: z.string().max(30).trim().optional(),
-})
-
-// Schema para Super Admin - puede crear ADMIN, SUPERVISOR, PHARMACY
+// Schema para Super Admin - puede crear ADMIN, SUPERVISOR, SUPER_ADMIN
+// NOTA: PHARMACY ya no es un rol de usuario - las farmacias están en colección Pharmacy
 export const adminCreateUserSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100).trim(),
   email: z.string().email('Email inválido').toLowerCase().trim(),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
-  role: z.enum(['ADMIN', 'SUPERVISOR', 'PHARMACY', 'SUPER_ADMIN'], {
+  role: z.enum(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN'], {
     errorMap: () => ({ message: 'Rol inválido' }),
   }),
-  pharmacyName: z.string().max(100).trim().optional(),
-  pharmacyCode: z.string().max(20).trim().optional(),
   phone: z.string().max(30).trim().optional(),
   assignedPharmacies: z.array(z.string()).default([]),
-}).refine((data) => {
-  // Si es PHARMACY, pharmacyName es requerido
-  if (data.role === 'PHARMACY') {
-    return !!data.pharmacyName && data.pharmacyName.length > 0
-  }
-  return true
-}, {
-  message: 'El nombre de sucursal es requerido para rol PHARMACY',
-  path: ['pharmacyName'],
 })
 
 // Schema para actualizar usuario por Super Admin
 export const adminUpdateUserSchema = z.object({
   name: z.string().min(2).max(100).trim().optional(),
   email: z.string().email().toLowerCase().trim().optional(),
-  role: z.enum(['ADMIN', 'SUPERVISOR', 'PHARMACY', 'SUPER_ADMIN']).optional(),
-  pharmacyName: z.string().max(100).trim().optional(),
-  pharmacyCode: z.string().max(20).trim().optional(),
+  role: z.enum(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN']).optional(),
   phone: z.string().max(30).trim().optional(),
   assignedPharmacies: z.array(z.string()).optional(),
   isActive: z.boolean().optional(),
@@ -114,7 +130,7 @@ export const updateExpenseStatusSchema = z.object({
 
 // ---- Tipos inferidos desde Zod ----
 export type LoginInput = z.infer<typeof loginSchema>
-export type CreateUserInput = z.infer<typeof createUserSchema>
+export type CreateUserInput = z.infer<typeof adminCreateUserSchema>
 export type AdminCreateUserInput = z.infer<typeof adminCreateUserSchema>
 export type AdminUpdateUserInput = z.infer<typeof adminUpdateUserSchema>
 export type AdminChangePasswordInput = z.infer<typeof adminChangePasswordSchema>

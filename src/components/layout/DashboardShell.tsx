@@ -10,7 +10,7 @@ interface DashboardShellProps {
   user: {
     name?: string | null
     role: UserRole
-    pharmacyName?: string
+    assignedPharmacies?: string[]
     profileImage?: string
   }
 }
@@ -22,7 +22,7 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
     <div className="flex h-screen bg-gray-50/50">
       <Sidebar 
         role={user.role} 
-        pharmacyName={user.pharmacyName} 
+        assignedPharmacies={user.assignedPharmacies}
         isOpen={isSidebarOpen} 
         setIsOpen={setIsSidebarOpen} 
         profileImage={user.profileImage}

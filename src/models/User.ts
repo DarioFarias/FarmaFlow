@@ -34,24 +34,22 @@ const UserSchema = new Schema<IUserDocument>(
     role: {
       type: String,
       enum: Object.values(UserRole),
-      default: UserRole.PHARMACY,
+      default: UserRole.SUPERVISOR,
       required: true,
     },
+    // NOTE: pharmacyName y pharmacyCode fueron movidos a colección Pharmacy
+    // Se mantienen como campos opcionales para backwards compatibility con datos existentes
+    // La nueva vía de acceso es a través de la colección Pharmacy
     pharmacyName: {
       type: String,
       trim: true,
-      // Requerido solo si el rol es PHARMACY
-      required: function (this: IUserDocument) {
-        return this.role === UserRole.PHARMACY
-      },
+      default: undefined,
     },
     pharmacyCode: {
       type: String,
-      unique: true,
-      sparse: true,   // Permite múltiples documentos con null
-      uppercase: true,
       trim: true,
-      maxlength: [20, 'El código no puede superar 20 caracteres'],
+      uppercase: true,
+      default: undefined,
     },
     phone: {
       type: String,

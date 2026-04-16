@@ -4,11 +4,11 @@ import bcrypt from 'bcryptjs'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import { UserRole } from '@/types'
-import { isAdmin as checkIsAdmin, isPharmacy as checkIsPharmacy } from './roles'
+import { isAdmin as checkIsAdmin } from './roles'
 
 // =============================================
 // FARMAFLOW - Configuración de NextAuth.js
-// RBAC: roles ADMIN (Supervisor) y PHARMACY (Sucursal)
+// RBAC: roles ADMIN (Supervisor), SUPER_ADMIN y SUPERVISOR
 // =============================================
 
 export const authOptions: NextAuthOptions = {
@@ -58,8 +58,6 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           email: user.email,
           role: user.role,
-          pharmacyName: user.pharmacyName,
-          pharmacyCode: user.pharmacyCode,
           profileImage: user.profileImage,
           assignedPharmacies: user.assignedPharmacies || [],
         }
@@ -72,8 +70,6 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = (user as { role: UserRole }).role
-        token.pharmacyName = (user as any).pharmacyName
-        token.pharmacyCode = (user as any).pharmacyCode
         token.profileImage = (user as any).profileImage
         token.assignedPharmacies = (user as any).assignedPharmacies || []
       }
@@ -84,8 +80,6 @@ export const authOptions: NextAuthOptions = {
       if (token && session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as UserRole
-        session.user.pharmacyName = token.pharmacyName as string | undefined
-        session.user.pharmacyCode = token.pharmacyCode as string | undefined
         session.user.profileImage = token.profileImage as string | undefined
         session.user.assignedPharmacies = token.assignedPharmacies as string[] | undefined
       }
@@ -97,8 +91,4 @@ export const authOptions: NextAuthOptions = {
 // ---- Helpers de autorización ----
 export function isAdmin(role?: UserRole): boolean {
   return checkIsAdmin(role)
-}
-
-export function isPharmacy(role?: UserRole): boolean {
-  return checkIsPharmacy(role)
 }

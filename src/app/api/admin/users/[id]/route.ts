@@ -42,15 +42,16 @@ export async function PATCH(
       user.email = validated.email
     }
     if (validated.role !== undefined) user.role = validated.role as UserRole
-    if (validated.pharmacyName !== undefined) user.pharmacyName = validated.pharmacyName
-    if (validated.pharmacyCode !== undefined) {
-      // Verificar pharmacyCode único
-      const existingCode = await User.findOne({ pharmacyCode: validated.pharmacyCode, _id: { $ne: id } })
-      if (existingCode) {
-        return NextResponse.json({ error: 'El código de sucursal ya está en uso' }, { status: 400 })
-      }
-      user.pharmacyCode = validated.pharmacyCode
-    }
+    // NOTE: pharmacyName y pharmacyCode ya no existen en IUser (las farmacias están en colección Pharmacy)
+    // if (validated.pharmacyName !== undefined) user.pharmacyName = validated.pharmacyName
+    // if (validated.pharmacyCode !== undefined) {
+    //   // Verificar pharmacyCode único
+    //   const existingCode = await User.findOne({ pharmacyCode: validated.pharmacyCode, _id: { $ne: id } })
+    //   if (existingCode) {
+    //     return NextResponse.json({ error: 'El código de sucursal ya está en uso' }, { status: 400 })
+    //   }
+    //   user.pharmacyCode = validated.pharmacyCode
+    // }
     if (validated.phone !== undefined) user.phone = validated.phone
     if (validated.isActive !== undefined) user.isActive = validated.isActive
 
@@ -77,12 +78,27 @@ export async function DELETE(
     }
 
     const { id } = params
+    
+    // 1. Prevenir auto-eliminación
+    if (session.user.id === id) {
+      return NextResponse.json({ error: 'No puedes eliminar tu propia cuenta' }, { status: 400 })
+    }
 
     await connectDB()
     const user = await User.findById(id)
 
     if (!user) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+    }
+
+    // 2. Prevenir eliminación del último Super Admin
+    if (user.role === UserRole.SUPER_ADMIN) {
+      const superAdminCount = await User.countDocuments({ role: UserRole.SUPER_ADMIN, isActive: true })
+      if (superAdminCount <= 1) {
+        return NextResponse.json({ 
+          error: 'No se puede eliminar al último Super Admin activo. El sistema debe tener al menos uno.' 
+        }, { status: 400 })
+      }
     }
 
     // Soft delete: marcar como inactivo

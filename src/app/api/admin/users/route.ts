@@ -10,7 +10,8 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
 // Roles que un ADMIN puede crear (NO puede crear ADMIN ni SUPER_ADMIN)
-const ADMIN_CAN_CREATE_ROLES = [UserRole.SUPERVISOR, UserRole.PHARMACY]
+// NOTE: PHARMACY ya no es un rol - las farmacias están en colección Pharmacy
+const ADMIN_CAN_CREATE_ROLES = [UserRole.SUPERVISOR]
 
 export async function GET(req: NextRequest) {
   try {
@@ -57,12 +58,14 @@ export async function POST(req: NextRequest) {
     await connectDB()
     
     // Verificar permisos de creación de roles
-    // SUPER_ADMIN puede crear ADMIN, SUPERVISOR, PHARMACY
-    // ADMIN puede crear SUPERVISOR, PHARMACY (NO ADMIN ni SUPER_ADMIN)
-    if (!isSuperAdmin(userRole)) {
-      if (validated.role === UserRole.ADMIN || validated.role === UserRole.SUPER_ADMIN) {
-        return NextResponse.json({ error: 'No tienes permisos para crear rol ' + validated.role }, { status: 403 })
-      }
+    // SUPER_ADMIN puede crear SUPER_ADMIN, ADMIN, SUPERVISOR
+    // ADMIN puede crear SUPERVISOR (NO ADMIN ni SUPER_ADMIN)
+    // NOTA: PHARMACY ya no es un rol - las farmacias están en colección Pharmacy
+    if (validated.role === UserRole.SUPER_ADMIN && !isSuperAdmin(userRole)) {
+      return NextResponse.json({ error: 'No tienes permisos para crear Super Admin' }, { status: 403 })
+    }
+    if (validated.role === UserRole.ADMIN && !isSuperAdmin(userRole)) {
+      return NextResponse.json({ error: 'No tienes permisos para crear Administrador' }, { status: 403 })
     }
 
     // Verificar si el email ya existe
@@ -71,20 +74,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'El email ya está registrado' }, { status: 400 })
     }
 
-    // Verificar pharmacyCode único si se proporciona
-    if (validated.pharmacyCode) {
-      const existingCode = await User.findOne({ pharmacyCode: validated.pharmacyCode })
-      if (existingCode) {
-        return NextResponse.json({ error: 'El código de sucursal ya está en uso' }, { status: 400 })
-      }
-    }
-
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(validated.password, 12)
-
-    // Limpiar campos vacíos (convertir "" a undefined para que Mongoose no guarde)
-    const pharmacyCode = validated.pharmacyCode || undefined
-    const pharmacyName = validated.pharmacyName || undefined
 
     // Crear usuario
     const user = await User.create({
@@ -92,8 +83,6 @@ export async function POST(req: NextRequest) {
       email: validated.email,
       password: hashedPassword,
       role: validated.role as UserRole,
-      pharmacyName,
-      pharmacyCode,
       phone: validated.phone || undefined,
       assignedPharmacies: validated.assignedPharmacies || [],
       isActive: true,
@@ -106,8 +95,6 @@ export async function POST(req: NextRequest) {
         name: user.name,
         email: user.email,
         role: user.role,
-        pharmacyName: user.pharmacyName,
-        pharmacyCode: user.pharmacyCode,
         phone: user.phone,
         assignedPharmacies: user.assignedPharmacies,
         isActive: user.isActive,

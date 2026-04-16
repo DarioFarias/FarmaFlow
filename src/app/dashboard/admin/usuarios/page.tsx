@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { 
   Users, Shield, UserCog, ToggleLeft, ToggleRight, 
   Loader2, Plus, X, Pencil, Trash2, Eye, EyeOff,
@@ -14,9 +15,7 @@ interface UserFormData {
   name: string
   email: string
   password: string
-  role: 'ADMIN' | 'SUPERVISOR' | 'PHARMACY'
-  pharmacyName: string
-  pharmacyCode: string
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR'
   phone: string
   assignedPharmacies: string[]
 }
@@ -25,14 +24,13 @@ const initialFormData: UserFormData = {
   name: '',
   email: '',
   password: '',
-  role: 'PHARMACY',
-  pharmacyName: '',
-  pharmacyCode: '',
+  role: 'SUPERVISOR',
   phone: '',
   assignedPharmacies: [],
 }
 
 export default function UsuariosAdminPage() {
+  const { data: session } = useSession()
   const [users, setUsers] = useState<IUser[]>([])
   const [pharmacies, setPharmacies] = useState<IUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -59,10 +57,10 @@ export default function UsuariosAdminPage() {
 
   const fetchPharmacies = async () => {
     try {
-      const res = await fetch('/api/admin/users?role=PHARMACY')
+      const res = await fetch('/api/admin/pharmacies')
       const data = await res.json()
       if (Array.isArray(data)) {
-        setPharmacies(data.filter((u: IUser) => u.pharmacyCode))
+        setPharmacies(data as unknown as IUser[])
       }
     } catch (error) {
       console.error('Error fetching pharmacies:', error)
@@ -164,11 +162,9 @@ export default function UsuariosAdminPage() {
       name: user.name,
       email: user.email,
       password: '',
-      role: user.role as 'ADMIN' | 'SUPERVISOR' | 'PHARMACY',
-      pharmacyName: user.pharmacyName || '',
-      pharmacyCode: user.pharmacyCode || '',
+      role: user.role as 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR',
       phone: user.phone || '',
-      assignedPharmacies: (user as any).assignedPharmacies || [],
+      assignedPharmacies: user.assignedPharmacies || [],
     })
     setFormError(null)
     setShowEditModal(true)
@@ -186,10 +182,8 @@ export default function UsuariosAdminPage() {
       if (formData.name) updateData.name = formData.name
       if (formData.email) updateData.email = formData.email
       if (formData.role) updateData.role = formData.role
-      if (formData.pharmacyName) updateData.pharmacyName = formData.pharmacyName
-      if (formData.pharmacyCode) updateData.pharmacyCode = formData.pharmacyCode
       if (formData.phone) updateData.phone = formData.phone
-      if (formData.role === 'SUPERVISOR') updateData.assignedPharmacies = formData.assignedPharmacies
+      if (formData.role === 'SUPERVISOR' || formData.role === 'ADMIN') updateData.assignedPharmacies = formData.assignedPharmacies
 
       const res = await fetch(`/api/admin/users/${selectedUser._id}`, {
         method: 'PATCH',
@@ -330,17 +324,16 @@ export default function UsuariosAdminPage() {
                       disabled={actionId === u._id}
                       className="text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none focus:ring-1 ring-brand-500"
                     >
-                      <option value="PHARMACY">PHARMACY</option>
-                      <option value="SUPERVISOR">SUPERVISOR</option>
-                      <option value="ADMIN">ADMIN</option>
+<option value="SUPERVISOR">SUPERVISOR</option>
+                  <option value="ADMIN">ADMIN</option>
                       <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                     </select>
                   </td>
                   <td className="py-4 px-4 text-sm text-gray-600">
-                    {u.role === 'SUPERVISOR' && u.assignedPharmacies?.length ? (
+                    {u.assignedPharmacies?.length ? (
                       <span className="text-xs">{u.assignedPharmacies.join(', ')}</span>
                     ) : (
-                      u.pharmacyName || u.pharmacyCode || '---'
+                      '---'
                     )}
                   </td>
                   <td className="py-4 px-4">
@@ -380,8 +373,18 @@ export default function UsuariosAdminPage() {
                       </button>
                       <button 
                         onClick={() => openDeleteModal(u)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Eliminar usuario"
+                        disabled={
+                          u.role === 'SUPER_ADMIN' && u._id === session?.user?.id ||
+                          u.role === 'SUPER_ADMIN' && users.filter(user => user.role === 'SUPER_ADMIN' && user.isActive).length <= 1
+                        }
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:hover:bg-transparent disabled:text-gray-200 disabled:cursor-not-allowed"
+                        title={
+                          u.role === 'SUPER_ADMIN' && u._id === session?.user?.id 
+                            ? 'No puedes eliminar tu propia cuenta'
+                            : u.role === 'SUPER_ADMIN' && users.filter(user => user.role === 'SUPER_ADMIN' && user.isActive).length <= 1
+                            ? 'No puedes eliminar al último Super Admin'
+                            : 'Eliminar usuario'
+                        }
                       >
                         <Trash2 size={18} />
                       </button>
@@ -452,53 +455,30 @@ export default function UsuariosAdminPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'SUPERVISOR' | 'PHARMACY', assignedPharmacies: e.target.value === 'SUPERVISOR' ? formData.assignedPharmacies : [] })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR', assignedPharmacies: e.target.value === 'SUPERVISOR' || e.target.value === 'ADMIN' ? formData.assignedPharmacies : [] })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                 >
-                  <option value="PHARMACY">PHARMACY</option>
                   <option value="SUPERVISOR">SUPERVISOR</option>
                   <option value="ADMIN">ADMIN</option>
+                  {session?.user?.role === 'SUPER_ADMIN' && (
+                    <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                  )}
                 </select>
               </div>
-              {formData.role === 'PHARMACY' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de Sucursal</label>
-                    <input
-                      type="text"
-                      required={formData.role === 'PHARMACY'}
-                      value={formData.pharmacyName}
-                      onChange={(e) => setFormData({ ...formData, pharmacyName: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                      placeholder="Farmacia Centro"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Código de Sucursal</label>
-                    <input
-                      type="text"
-                      value={formData.pharmacyCode}
-                      onChange={(e) => setFormData({ ...formData, pharmacyCode: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                      placeholder="FAR-001"
-                    />
-                  </div>
-                </>
-              )}
-              {formData.role === 'SUPERVISOR' && (
+              {(formData.role === 'SUPERVISOR' || formData.role === 'ADMIN') && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Farmacias Asignadas</label>
                   {pharmacies.length === 0 ? (
-                    <p className="text-sm text-gray-500 italic">No hay farmacias registradas. Crea primero farmacias con rol PHARMACY.</p>
+                    <p className="text-sm text-gray-500 italic">No hay farmacias registradas. Crea primero farmacias en /admin/farmacias.</p>
                   ) : (
                     <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
-                      {pharmacies.map((pharmacy) => (
+                      {pharmacies.map((pharmacy: any) => (
                         <label key={pharmacy._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                           <input
                             type="checkbox"
-                            checked={formData.assignedPharmacies.includes(pharmacy.pharmacyCode!)}
+                            checked={formData.assignedPharmacies.includes(pharmacy.pharmacyCode)}
                             onChange={(e) => {
-                              const code = pharmacy.pharmacyCode!
+                              const code = pharmacy.pharmacyCode
                               if (e.target.checked) {
                                 setFormData({ ...formData, assignedPharmacies: [...formData.assignedPharmacies, code] })
                               } else {
@@ -584,54 +564,34 @@ export default function UsuariosAdminPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                 />
               </div>
-              <div>
+<div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'ADMIN' | 'SUPERVISOR' | 'PHARMACY', assignedPharmacies: e.target.value === 'SUPERVISOR' ? formData.assignedPharmacies : [] })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR', assignedPharmacies: e.target.value === 'SUPERVISOR' || e.target.value === 'ADMIN' ? formData.assignedPharmacies : [] })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                 >
-                  <option value="PHARMACY">PHARMACY</option>
                   <option value="SUPERVISOR">SUPERVISOR</option>
                   <option value="ADMIN">ADMIN</option>
+                  {session?.user?.role === 'SUPER_ADMIN' && (
+                    <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                  )}
                 </select>
               </div>
-              {formData.role === 'PHARMACY' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de Sucursal</label>
-                    <input
-                      type="text"
-                      value={formData.pharmacyName}
-                      onChange={(e) => setFormData({ ...formData, pharmacyName: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Código de Sucursal</label>
-                    <input
-                      type="text"
-                      value={formData.pharmacyCode}
-                      onChange={(e) => setFormData({ ...formData, pharmacyCode: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                    />
-                  </div>
-                </>
-              )}
-                  {formData.role === 'SUPERVISOR' && (
+              {(formData.role === 'SUPERVISOR' || formData.role === 'ADMIN') && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Farmacias Asignadas</label>
                   {pharmacies.length === 0 ? (
                     <p className="text-sm text-gray-500 italic">No hay farmacias registradas.</p>
                   ) : (
                     <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
-                      {pharmacies.map((pharmacy) => (
+                      {pharmacies.map((pharmacy: any) => (
                         <label key={pharmacy._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                           <input
                             type="checkbox"
-                            checked={formData.assignedPharmacies.includes(pharmacy.pharmacyCode!)}
+                            checked={formData.assignedPharmacies.includes(pharmacy.pharmacyCode)}
                             onChange={(e) => {
-                              const code = pharmacy.pharmacyCode!
+                              const code = pharmacy.pharmacyCode
                               if (e.target.checked) {
                                 setFormData({ ...formData, assignedPharmacies: [...formData.assignedPharmacies, code] })
                               } else {

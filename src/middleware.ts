@@ -15,24 +15,11 @@ export default withAuth(
 
     const role = token?.role as UserRole | undefined
 
-    // Rutas exclusivas del ADMIN (Supervisor)
+    // Rutas exclusivas del ADMIN (Supervisor) y SUPER_ADMIN
     const adminRoutes = ['/dashboard/admin', '/dashboard/farmacias', '/api/admin']
     const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route))
 
     if (isAdminRoute && !isAdmin(role)) {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-      }
-      return NextResponse.redirect(new URL('/dashboard', req.url))
-    }
-
-    // Rutas exclusivas de PHARMACY
-    const pharmacyRoutes = ['/dashboard/mis-pedidos', '/dashboard/mis-gastos']
-    const isPharmacyRoute = pharmacyRoutes.some((route) =>
-      pathname.startsWith(route)
-    )
-
-    if (isPharmacyRoute && role !== UserRole.PHARMACY) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
       }

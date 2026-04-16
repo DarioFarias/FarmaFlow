@@ -15,15 +15,15 @@ export function isSuperAdmin(role?: UserRole): boolean {
 }
 
 /**
- * Verifica si un rol es de Farmacia
- */
-export function isPharmacy(role?: UserRole): boolean {
-  return role === UserRole.PHARMACY
-}
-
-/**
  * Verifica si un rol es Supervisor (acceso limitado a assignedPharmacies)
  */
 export function isSupervisor(role?: UserRole): boolean {
   return role === UserRole.SUPERVISOR
+}
+
+/**
+ * Verifica si un rol tiene acceso a farmacias (Admin, Super Admin o Supervisor)
+ */
+export function hasPharmacyAccess(role?: UserRole): boolean {
+  return isAdmin(role) || isSupervisor(role)
 }
