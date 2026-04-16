@@ -16,7 +16,6 @@ const UserSchema = new Schema<IUserDocument>(
     },
     email: {
       type: String,
-      unique: true,
       lowercase: true,
       trim: true,
       sparse: true, // Permite null sin violar unique
