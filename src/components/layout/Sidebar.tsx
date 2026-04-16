@@ -17,6 +17,7 @@ interface SidebarProps {
 export function Sidebar({ role, assignedPharmacies, isOpen, setIsOpen, profileImage }: SidebarProps) {
   const pathname = usePathname()
   const isAdmin = role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN
+  const isSupervisor = role === UserRole.SUPERVISOR
   
   // Mostrar el código de la primera farmacia asignada o "Mi Farmacia"
   const pharmacyLabel = assignedPharmacies && assignedPharmacies.length > 0 
@@ -31,6 +32,13 @@ export function Sidebar({ role, assignedPharmacies, isOpen, setIsOpen, profileIm
         { name: 'Farmacias', href: '/dashboard/admin/farmacias', icon: Users },
         ...(role === UserRole.SUPER_ADMIN ? [{ name: 'Gestión Usuarios', href: '/dashboard/admin/usuarios', icon: UserCog }] : []),
       ]
+    : isSupervisor
+      ? [
+          { name: 'Inicio', href: '/dashboard', icon: Home },
+          { name: 'Mis Pedidos', href: '/dashboard/suministros', icon: Package },
+          { name: 'Mis Gastos', href: '/dashboard/gastos', icon: Receipt },
+          { name: 'Farmacias', href: '/dashboard/admin/farmacias', icon: Users },
+        ]
     : [
         { name: 'Inicio', href: '/dashboard', icon: Home },
         { name: 'Mis Pedidos', href: '/dashboard/suministros', icon: Package },
