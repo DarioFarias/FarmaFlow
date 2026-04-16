@@ -20,7 +20,7 @@ export const pharmacyCreateSchema = z.object({
     .trim(),
   address: z.string().max(200).trim().optional(),
   phone: z.string().max(30).trim().optional(),
-  email: z.string().email('Email inválido').toLowerCase().trim().optional(),
+  email: z.string().email('Email inválido').toLowerCase().trim().optional().or(z.literal('')),
 })
 
 export const pharmacyUpdateSchema = z.object({

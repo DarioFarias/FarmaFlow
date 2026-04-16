@@ -112,7 +112,7 @@ export function CreatePharmacyForm() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Email de Contacto</label>
+            <label className="block text-sm font-medium text-gray-700">Email de Contacto (opcional)</label>
             <div className="relative">
               <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
