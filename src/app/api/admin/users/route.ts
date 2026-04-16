@@ -68,10 +68,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No tienes permisos para crear Administrador' }, { status: 403 })
     }
 
-    // Verificar si el email ya existe
-    const existingUser = await User.findOne({ email: validated.email })
-    if (existingUser) {
-      return NextResponse.json({ error: 'El email ya está registrado' }, { status: 400 })
+    // Verificar si el username ya existe
+    if (validated.username) {
+      const existingUsername = await User.findOne({ username: validated.username.toLowerCase() })
+      if (existingUsername) {
+        return NextResponse.json({ error: 'El nombre de usuario ya está registrado' }, { status: 400 })
+      }
+    }
+
+    // Verificar si el email ya existe (solo si se proporciona)
+    if (validated.email) {
+      const existingEmail = await User.findOne({ email: validated.email.toLowerCase() })
+      if (existingEmail) {
+        return NextResponse.json({ error: 'El email ya está registrado' }, { status: 400 })
+      }
     }
 
     // Hash de la contraseña
@@ -80,7 +90,8 @@ export async function POST(req: NextRequest) {
     // Crear usuario
     const user = await User.create({
       name: validated.name,
-      email: validated.email,
+      username: validated.username.toLowerCase().trim(),
+      email: validated.email?.toLowerCase().trim() || undefined,
       password: hashedPassword,
       role: validated.role as UserRole,
       phone: validated.phone || undefined,
@@ -93,6 +104,7 @@ export async function POST(req: NextRequest) {
       user: {
         _id: user._id,
         name: user.name,
+        username: user.username,
         email: user.email,
         role: user.role,
         phone: user.phone,

@@ -13,6 +13,7 @@ import clsx from 'clsx'
 
 interface UserFormData {
   name: string
+  username: string
   email: string
   password: string
   role: 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR'
@@ -22,6 +23,7 @@ interface UserFormData {
 
 const initialFormData: UserFormData = {
   name: '',
+  username: '',
   email: '',
   password: '',
   role: 'SUPERVISOR',
@@ -155,11 +157,12 @@ export default function UsuariosAdminPage() {
     }
   }
 
-  // Edit user handlers
+// Edit user handlers
   const openEditModal = (user: IUser) => {
     setSelectedUser(user)
-setFormData({
+    setFormData({
       name: user.name,
+      username: user.username || '',
       email: user.email || '',
       password: '',
       role: user.role as 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR',
@@ -180,6 +183,7 @@ setFormData({
       // Filtrar campos no vacíos
       const updateData: Partial<UserFormData> = {}
       if (formData.name) updateData.name = formData.name
+      if (formData.username) updateData.username = formData.username
       if (formData.email) updateData.email = formData.email
       if (formData.role) updateData.role = formData.role
       if (formData.phone) updateData.phone = formData.phone
@@ -420,10 +424,20 @@ setFormData({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+                  placeholder="Nombre de usuario (mínimo 3 caracteres)"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email (opcional)</label>
                 <input
                   type="email"
-                  required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
@@ -544,7 +558,7 @@ setFormData({
               </button>
             </div>
             <form onSubmit={handleEditSubmit} className="p-4 space-y-4">
-              <div>
+<div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
                 <input
                   type="text"
@@ -555,16 +569,25 @@ setFormData({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email (opcional)</label>
                 <input
                   type="email"
-                  required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                 />
               </div>
-<div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
                 <select
                   value={formData.role}

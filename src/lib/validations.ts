@@ -49,7 +49,8 @@ export const loginSchema = z.object({
 // NOTA: PHARMACY ya no es un rol de usuario - las farmacias están en colección Pharmacy
 export const adminCreateUserSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100).trim(),
-  email: z.string().email('Email inválido').toLowerCase().trim(),
+  username: z.string().min(3, 'El nombre de usuario debe tener al menos 3 caracteres').max(30).trim(),
+  email: z.string().email('Email inválido').toLowerCase().trim().optional().or(z.literal('')),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   role: z.enum(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN'], {
     errorMap: () => ({ message: 'Rol inválido' }),
@@ -61,7 +62,8 @@ export const adminCreateUserSchema = z.object({
 // Schema para actualizar usuario por Super Admin
 export const adminUpdateUserSchema = z.object({
   name: z.string().min(2).max(100).trim().optional(),
-  email: z.string().email().toLowerCase().trim().optional(),
+  username: z.string().min(3).max(30).trim().optional(),
+  email: z.string().email().toLowerCase().trim().optional().or(z.literal('')),
   role: z.enum(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN']).optional(),
   phone: z.string().max(30).trim().optional(),
   assignedPharmacies: z.array(z.string()).optional(),
