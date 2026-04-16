@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     const user = await User.create({
       name: validated.name,
       username: validated.username.toLowerCase().trim(),
-      email: validated.email?.toLowerCase().trim() || undefined,
+      email: validated.email ? validated.email.toLowerCase().trim() : undefined,
       password: hashedPassword,
       role: validated.role as UserRole,
       phone: validated.phone || undefined,

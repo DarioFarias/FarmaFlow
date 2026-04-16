@@ -56,7 +56,7 @@ export const adminCreateUserSchema = z.object({
     errorMap: () => ({ message: 'Rol inválido' }),
   }),
   phone: z.string().max(30).trim().optional(),
-  assignedPharmacies: z.array(z.string()).default([]),
+  assignedPharmacies: z.array(z.string()).max(50).default([]),
 })
 
 // Schema para actualizar usuario por Super Admin

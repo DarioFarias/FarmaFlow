@@ -7,7 +7,7 @@ import {
   Loader2, Plus, X, Pencil, Trash2, Eye, EyeOff,
   Mail, Phone, Building, Key
 } from 'lucide-react'
-import { UserRole, IUser } from '@/types'
+import { UserRole, IUser, IPharmacy } from '@/types'
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
 
@@ -34,7 +34,7 @@ const initialFormData: UserFormData = {
 export default function UsuariosAdminPage() {
   const { data: session } = useSession()
   const [users, setUsers] = useState<IUser[]>([])
-  const [pharmacies, setPharmacies] = useState<IUser[]>([])
+  const [pharmacies, setPharmacies] = useState<IPharmacy[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
   
@@ -62,7 +62,7 @@ export default function UsuariosAdminPage() {
       const res = await fetch('/api/admin/pharmacies')
       const data = await res.json()
       if (Array.isArray(data)) {
-        setPharmacies(data as unknown as IUser[])
+        setPharmacies(data as unknown as IPharmacy[])
       }
     } catch (error) {
       console.error('Error fetching pharmacies:', error)
@@ -490,9 +490,9 @@ export default function UsuariosAdminPage() {
                         <label key={pharmacy._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                           <input
                             type="checkbox"
-                            checked={formData.assignedPharmacies.includes(pharmacy.pharmacyCode)}
+                            checked={formData.assignedPharmacies.includes(pharmacy._id)}
                             onChange={(e) => {
-                              const code = pharmacy.pharmacyCode
+                              const code = pharmacy._id
                               if (e.target.checked) {
                                 setFormData({ ...formData, assignedPharmacies: [...formData.assignedPharmacies, code] })
                               } else {
@@ -502,8 +502,7 @@ export default function UsuariosAdminPage() {
                             className="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500"
                           />
                           <span className="text-sm">
-                            <span className="font-semibold text-gray-900">{pharmacy.pharmacyCode}</span>
-                            <span className="text-gray-500"> - {pharmacy.pharmacyName}</span>
+                            <span className="font-semibold text-gray-900">{pharmacy.pharmacyName}</span>
                           </span>
                         </label>
                       ))}
@@ -612,9 +611,9 @@ export default function UsuariosAdminPage() {
                         <label key={pharmacy._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                           <input
                             type="checkbox"
-                            checked={formData.assignedPharmacies.includes(pharmacy.pharmacyCode)}
+                            checked={formData.assignedPharmacies.includes(pharmacy._id)}
                             onChange={(e) => {
-                              const code = pharmacy.pharmacyCode
+                              const code = pharmacy._id
                               if (e.target.checked) {
                                 setFormData({ ...formData, assignedPharmacies: [...formData.assignedPharmacies, code] })
                               } else {
@@ -624,8 +623,7 @@ export default function UsuariosAdminPage() {
                             className="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500"
                           />
                           <span className="text-sm">
-                            <span className="font-semibold text-gray-900">{pharmacy.pharmacyCode}</span>
-                            <span className="text-gray-500"> - {pharmacy.pharmacyName}</span>
+                            <span className="font-semibold text-gray-900">{pharmacy.pharmacyName}</span>
                           </span>
                         </label>
                       ))}
