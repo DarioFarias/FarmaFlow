@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import Pharmacy from '@/models/Pharmacy'
-import { isSuperAdmin, isAdmin } from '@/lib/roles'
+import { isSuperAdmin, isAdmin, isSupervisor } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { pharmacyCreateSchema } from '@/lib/validations'
 import { z } from 'zod'
@@ -11,7 +11,8 @@ import { z } from 'zod'
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || (!isSuperAdmin(session.user.role as UserRole) && !isAdmin(session.user.role as UserRole))) {
+    const userRole = session?.user?.role as UserRole
+    if (!session || (!isSuperAdmin(userRole) && !isAdmin(userRole) && !isSupervisor(userRole))) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
@@ -20,11 +21,27 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const activeFilter = searchParams.get('active')
     
-    let query = {}
+    let query: Record<string, unknown> = {}
     if (activeFilter === 'true') {
       query = { isActive: true }
     } else if (activeFilter === 'false') {
       query = { isActive: false }
+    }
+    
+    // Si es SUPERVISOR, solo puede ver las farmacias asignadas
+    if (isSupervisor(userRole)) {
+      const assignedPharmacies = (session.user as any).assignedPharmacies || []
+      if (assignedPharmacies.length > 0) {
+        // Buscar pharmacies por assignedPharmacies (pharmacyCode en la colección Pharmacy)
+        const assignedPharmaciesDocs = await Pharmacy.find({ 
+          pharmacyCode: { $in: assignedPharmacies },
+        }).select('_id')
+        const pharmacyIds = assignedPharmaciesDocs.map(p => p._id)
+        query._id = { $in: pharmacyIds }
+      } else {
+        // Si no tiene farmacias asignadas, no ve nada
+        query._id = { $in: [] }
+      }
     }
     
     const pharmacies = await Pharmacy.find(query).sort({ pharmacyName: 1 })

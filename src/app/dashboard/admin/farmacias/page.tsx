@@ -1,14 +1,34 @@
 import Link from 'next/link'
 import { Plus, MapPin, Phone, Mail, Edit } from 'lucide-react'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import Pharmacy from '@/models/Pharmacy'
+import { UserRole } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
 export default async function FarmaciasPage() {
   await connectDB()
   
-  const farmacias = await Pharmacy.find({}).sort({ pharmacyName: 1 })
+  const session = await getServerSession(authOptions) as any
+  const userRole = session?.user?.role as UserRole | undefined
+  const assignedPharmacies = session?.user?.assignedPharmacies as string[] | undefined
+  
+  let farmacias = await Pharmacy.find({}).sort({ pharmacyName: 1 })
+
+  // Si es SUPERVISOR, filtrar solo las farmacias asignadas
+  const isSupervisor = userRole === 'SUPERVISOR'
+  if (isSupervisor && assignedPharmacies && assignedPharmacies.length > 0) {
+    // Convertir ObjectId a string para comparar
+    const assignedIds = assignedPharmacies.map(id => id.toString())
+    farmacias = farmacias.filter(f => 
+      assignedIds.includes(f._id.toString()) || 
+      assignedIds.includes(String(f._id))
+    ) as any
+  }
+
+  const showNoAccessMessage = isSupervisor && (!assignedPharmacies || assignedPharmacies.length === 0)
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -26,7 +46,11 @@ export default async function FarmaciasPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {farmacias.length === 0 ? (
+        {showNoAccessMessage ? (
+          <div className="col-span-full py-12 text-center text-gray-400 text-sm italic bg-white rounded-xl border border-gray-100">
+            No tienes farmacias asignadas. Contacta al administrador para que te asigne sucursales.
+          </div>
+        ) : farmacias.length === 0 ? (
           <div className="col-span-full py-12 text-center text-gray-400 text-sm italic bg-white rounded-xl border border-gray-100">
             No hay farmacias registradas todavía. ¡Haz clic en "Nueva Farmacia" para empezar!
           </div>
