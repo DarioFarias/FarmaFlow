@@ -52,18 +52,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Farmacia no encontrada' }, { status: 404 })
     }
 
-    // Validar pharmacyCode único (si se cambia)
-    if (validated.pharmacyCode) {
-      const existingCode = await Pharmacy.findOne({ 
-        pharmacyCode: validated.pharmacyCode.toUpperCase(), 
-        _id: { $ne: params.id } 
-      })
-      if (existingCode) {
-        return NextResponse.json({ error: 'El código de farmacia ya está en uso' }, { status: 400 })
-      }
-      pharmacy.pharmacyCode = validated.pharmacyCode.toUpperCase()
-    }
-
     // Validar pharmacyName único (si se cambia)
     if (validated.pharmacyName) {
       const existingName = await Pharmacy.findOne({ 
@@ -87,7 +75,6 @@ export async function PATCH(
       message: 'Farmacia actualizada correctamente',
       pharmacy: {
         _id: pharmacy._id,
-        pharmacyCode: pharmacy.pharmacyCode,
         pharmacyName: pharmacy.pharmacyName,
         address: pharmacy.address,
         phone: pharmacy.phone,

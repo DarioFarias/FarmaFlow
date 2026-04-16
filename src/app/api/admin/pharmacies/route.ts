@@ -50,12 +50,6 @@ export async function POST(req: NextRequest) {
     
     await connectDB()
     
-    // Verificar pharmacyCode único
-    const existingCode = await Pharmacy.findOne({ pharmacyCode: validated.pharmacyCode.toUpperCase() })
-    if (existingCode) {
-      return NextResponse.json({ error: 'El código de farmacia ya está en uso' }, { status: 400 })
-    }
-    
     // Verificar pharmacyName único
     const existingName = await Pharmacy.findOne({ pharmacyName: { $regex: new RegExp(`^${validated.pharmacyName}$`, 'i') } })
     if (existingName) {
@@ -64,7 +58,6 @@ export async function POST(req: NextRequest) {
     
     // Crear farmacia
     const pharmacy = await Pharmacy.create({
-      pharmacyCode: validated.pharmacyCode.toUpperCase(),
       pharmacyName: validated.pharmacyName,
       address: validated.address || undefined,
       phone: validated.phone || undefined,
@@ -75,7 +68,6 @@ export async function POST(req: NextRequest) {
       message: 'Farmacia creada correctamente',
       pharmacy: {
         _id: pharmacy._id,
-        pharmacyCode: pharmacy.pharmacyCode,
         pharmacyName: pharmacy.pharmacyName,
         address: pharmacy.address,
         phone: pharmacy.phone,

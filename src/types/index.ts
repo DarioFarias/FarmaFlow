@@ -63,7 +63,6 @@ export enum ExpenseCategory {
 
 export interface IPharmacy {
   _id: string
-  pharmacyCode: string      // Código único: "FAR-001"
   pharmacyName: string      // Nombre del establecimiento
   address?: string        // Dirección física
   phone?: string          // Teléfono de contacto

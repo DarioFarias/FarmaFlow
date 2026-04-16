@@ -3,11 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-hot-toast'
-import { Loader2, ArrowLeft, Save, MapPin, Phone, Mail, Hash } from 'lucide-react'
+import { Loader2, ArrowLeft, Save, MapPin, Phone, Mail } from 'lucide-react'
 import Link from 'next/link'
 
 interface PharmacyFormData {
-  pharmacyCode: string
   pharmacyName: string
   address: string
   phone: string
@@ -15,7 +14,6 @@ interface PharmacyFormData {
 }
 
 const initialFormData: PharmacyFormData = {
-  pharmacyCode: '',
   pharmacyName: '',
   address: '',
   phone: '',
@@ -72,22 +70,7 @@ export function CreatePharmacyForm() {
           <p className="text-sm text-gray-500">Agrega una nueva sucursal al sistema.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Código</label>
-            <div className="relative">
-              <Hash size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                required
-                value={formData.pharmacyCode}
-                onChange={(e) => setFormData({ ...formData, pharmacyCode: e.target.value.toUpperCase() })}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                placeholder="FAR-001"
-              />
-            </div>
-          </div>
-
+        <div className="grid grid-cols-1 gap-4">
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">Nombre de la Farmacia</label>
             <input
@@ -100,7 +83,7 @@ export function CreatePharmacyForm() {
             />
           </div>
 
-          <div className="col-span-full space-y-2">
+          <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">Dirección</label>
             <div className="relative">
               <MapPin size={18} className="absolute left-3 top-3 text-gray-400" />

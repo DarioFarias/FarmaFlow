@@ -7,14 +7,6 @@ export interface IPharmacyDocument extends Omit<IPharmacy, '_id'>, Document {}
 // ---- ESQUEMA ----
 const PharmacySchema = new Schema<IPharmacyDocument>(
   {
-    pharmacyCode: {
-      type: String,
-      required: [true, 'El código de farmacia es obligatorio'],
-      unique: true,
-      uppercase: true,
-      trim: true,
-      maxlength: 20,
-    },
     pharmacyName: {
       type: String,
       required: [true, 'El nombre de la farmacia es obligatorio'],

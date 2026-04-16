@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Plus, MapPin, Phone, Mail } from 'lucide-react'
+import { Plus, MapPin, Phone, Mail, Edit } from 'lucide-react'
 import connectDB from '@/lib/mongodb'
 import Pharmacy from '@/models/Pharmacy'
 
@@ -35,8 +35,8 @@ export default async function FarmaciasPage() {
             <div key={f.id} className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <span className="text-xs font-mono font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded">
-                    {f.pharmacyCode}
+                  <span className="text-xs font-mono text-gray-500 bg-gray-50 px-2 py-0.5 rounded">
+                    ID: {String(f._id).slice(-8)}
                   </span>
                 </div>
                 {f.isActive ? (

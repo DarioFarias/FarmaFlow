@@ -14,11 +14,6 @@ import {
 // ---- FARMACIAS ----
 
 export const pharmacyCreateSchema = z.object({
-  pharmacyCode: z.string()
-    .min(1, 'El código es requerido')
-    .max(20, 'Máximo 20 caracteres')
-    .trim()
-    .toUpperCase(),
   pharmacyName: z.string()
     .min(2, 'El nombre es requerido')
     .max(100, 'Máximo 100 caracteres')
@@ -29,12 +24,6 @@ export const pharmacyCreateSchema = z.object({
 })
 
 export const pharmacyUpdateSchema = z.object({
-  pharmacyCode: z.string()
-    .min(1)
-    .max(20)
-    .trim()
-    .toUpperCase()
-    .optional(),
   pharmacyName: z.string()
     .min(2)
     .max(100)
