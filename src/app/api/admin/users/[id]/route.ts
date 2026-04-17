@@ -44,6 +44,14 @@ export async function PATCH(
 
     // Actualizar campos
     if (validated.name !== undefined) user.name = validated.name
+    if (validated.username !== undefined) {
+      // Verificar que el nuevo username no esté en uso por otro usuario
+      const existingUsername = await User.findOne({ username: validated.username.toLowerCase(), _id: { $ne: id } })
+      if (existingUsername) {
+        return NextResponse.json({ error: 'El nombre de usuario ya está en uso por otro usuario' }, { status: 400 })
+      }
+      user.username = validated.username
+    }
     if (validated.email !== undefined) {
       // Verificar que el nuevo email no esté en uso por otro usuario
       const existingEmail = await User.findOne({ email: validated.email, _id: { $ne: id } })
