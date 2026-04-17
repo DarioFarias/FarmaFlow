@@ -258,9 +258,13 @@ export default function UsuariosAdminPage() {
       if (formData.email) updateData.email = formData.email
       if (formData.role) updateData.role = formData.role
       if (formData.phone) updateData.phone = formData.phone
-      if (formData.role === UserRole.SUPERVISOR || formData.role === UserRole.ADMIN) {
-        // Si el creador es ENCARGADO, no puede editar las assignedPharmacies de otros usuarios
-        if (currentRole !== UserRole.ENCARGADO) {
+      
+      // Solo incluir assignedPharmacies si:
+      // 1. El usuario actual NO es ENCARGADO (los encargados no pueden editar farmacias)
+      // 2. El rol del usuario a editar requiere farmacias (ADMIN o SUPERVISOR)
+      if (currentRole !== UserRole.ENCARGADO) {
+        const targetRoleToEdit = formData.role
+        if (targetRoleToEdit === UserRole.SUPERVISOR || targetRoleToEdit === UserRole.ADMIN) {
           updateData.assignedPharmacies = formData.assignedPharmacies
         }
       }

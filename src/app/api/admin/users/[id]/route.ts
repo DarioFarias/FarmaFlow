@@ -65,6 +65,7 @@ export async function PATCH(
     // }
     if (validated.phone !== undefined) user.phone = validated.phone
     if (validated.isActive !== undefined) user.isActive = validated.isActive
+    if (validated.assignedPharmacies !== undefined) user.assignedPharmacies = validated.assignedPharmacies
 
     await user.save()
 
