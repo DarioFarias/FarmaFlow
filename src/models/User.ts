@@ -28,7 +28,7 @@ const UserSchema = new Schema<IUserDocument>(
       type: String,
       required: [true, 'El nombre de usuario es obligatorio'],
       unique: true,
-      lowercase: true,
+      // NOT lowercase: true - el username es case-sensitive
       trim: true,
       minlength: [3, 'El username debe tener al menos 3 caracteres'],
       maxlength: [30, 'El username no puede superar 30 caracteres'],
