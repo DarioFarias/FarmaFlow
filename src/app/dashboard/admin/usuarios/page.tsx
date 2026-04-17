@@ -5,9 +5,10 @@ import { useSession } from 'next-auth/react'
 import { 
   Users, Shield, UserCog, ToggleLeft, ToggleRight, 
   Loader2, Plus, X, Pencil, Trash2, Eye, EyeOff,
-  Mail, Phone, Building, Key
+  Mail, Phone, Building, Key, Check
 } from 'lucide-react'
 import { UserRole, IUser, IPharmacy } from '@/types'
+import { getCreatableRoles } from '@/lib/roles'
 import toast from 'react-hot-toast'
 import clsx from 'clsx'
 
@@ -16,17 +17,19 @@ interface UserFormData {
   username: string
   email: string
   password: string
-  role: 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR'
+  role: UserRole
   phone: string
   assignedPharmacies: string[]
 }
+
+type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error'
 
 const initialFormData: UserFormData = {
   name: '',
   username: '',
   email: '',
   password: '',
-  role: 'SUPERVISOR',
+  role: UserRole.SUPERVISOR,
   phone: '',
   assignedPharmacies: [],
 }
@@ -37,6 +40,17 @@ export default function UsuariosAdminPage() {
   const [pharmacies, setPharmacies] = useState<IPharmacy[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
+
+  // Roles del usuario actual
+  const currentRole = session?.user?.role as UserRole | undefined
+  const userAssignedPharmacies = session?.user?.assignedPharmacies as string[] | undefined
+
+  // Función para obtener el nombre de la pharmacy asignada al ENCARGADO
+  const getAssignedPharmacyName = () => {
+    if (!userAssignedPharmacies || userAssignedPharmacies.length === 0) return 'Sin asignar'
+    const pharmacy = pharmacies.find(p => p._id === userAssignedPharmacies[0])
+    return pharmacy?.pharmacyName || userAssignedPharmacies[0]
+  }
   
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -51,6 +65,13 @@ export default function UsuariosAdminPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  
+  // Username availability check
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle')
+  const [usernameChecking, setUsernameChecking] = useState(false)
+
+  // Obtener roles que el usuario actual puede crear
+  const creatableRoles = getCreatableRoles(session?.user?.role as UserRole)
 
   useEffect(() => {
     fetchUsers()
@@ -59,6 +80,9 @@ export default function UsuariosAdminPage() {
 
   const fetchPharmacies = async () => {
     try {
+      // Según el rol del usuario, el API retorna las farmacias apropiadas
+      // ADMIN/SUPER_ADMIN: todas las farmacias
+      // SUPERVISOR/ENCARGADO: solo las asignadas (el API filtra automáticamente)
       const res = await fetch('/api/admin/pharmacies')
       const data = await res.json()
       if (Array.isArray(data)) {
@@ -124,23 +148,69 @@ export default function UsuariosAdminPage() {
     }
   }
 
+  // Username availability check
+  const checkUsernameAvailability = async (username: string, excludeUserId?: string) => {
+    if (!username || username.length < 3) {
+      setUsernameStatus('idle')
+      return
+    }
+    
+    setUsernameStatus('checking')
+    setUsernameChecking(true)
+    
+    try {
+      const res = await fetch(`/api/admin/users/check?username=${encodeURIComponent(username)}`)
+      const data = await res.json()
+      
+      if (!res.ok) {
+        setUsernameStatus('error')
+        toast.error('Error al verificar usuario')
+        return
+      }
+      
+      if (data.available) {
+        setUsernameStatus('available')
+      } else {
+        setUsernameStatus('taken')
+      }
+    } catch (error) {
+      console.error('Username check error:', error)
+      setUsernameStatus('error')
+    } finally {
+      setUsernameChecking(false)
+    }
+  }
+
+  // Reset username status when modal closes
+  const resetUsernameStatus = () => {
+    setUsernameStatus('idle')
+    setUsernameChecking(false)
+  }
+
   // Create user handlers
   const openCreateModal = () => {
     setFormData(initialFormData)
     setShowPassword(false)
     setShowCreateModal(true)
+    resetUsernameStatus()
   }
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     setFormError(null)
-    
+
+    // Auto-asignar pharmacy si ENCARGADO crea VENDEDOR
+    const submitData = { ...formData }
+    if (currentRole === UserRole.ENCARGADO && formData.role === UserRole.VENDEDOR && userAssignedPharmacies) {
+      submitData.assignedPharmacies = userAssignedPharmacies
+    }
+
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       })
       
       const data = await res.json()
@@ -165,12 +235,13 @@ export default function UsuariosAdminPage() {
       username: user.username || '',
       email: user.email || '',
       password: '',
-      role: user.role as 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR',
+      role: user.role as UserRole,
       phone: user.phone || '',
       assignedPharmacies: user.assignedPharmacies || [],
     })
     setFormError(null)
     setShowEditModal(true)
+    resetUsernameStatus()
   }
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -187,7 +258,12 @@ export default function UsuariosAdminPage() {
       if (formData.email) updateData.email = formData.email
       if (formData.role) updateData.role = formData.role
       if (formData.phone) updateData.phone = formData.phone
-      if (formData.role === 'SUPERVISOR' || formData.role === 'ADMIN') updateData.assignedPharmacies = formData.assignedPharmacies
+      if (formData.role === UserRole.SUPERVISOR || formData.role === UserRole.ADMIN) {
+        // Si el creador es ENCARGADO, no puede editar las assignedPharmacies de otros usuarios
+        if (currentRole !== UserRole.ENCARGADO) {
+          updateData.assignedPharmacies = formData.assignedPharmacies
+        }
+      }
 
       const res = await fetch(`/api/admin/users/${selectedUser._id}`, {
         method: 'PATCH',
@@ -425,14 +501,49 @@ export default function UsuariosAdminPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                  placeholder="Nombre de usuario (mínimo 3 caracteres)"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={formData.username}
+                    onChange={(e) => {
+                      setFormData({ ...formData, username: e.target.value })
+                      if (usernameStatus !== 'idle') {
+                        setUsernameStatus('idle')
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value.length >= 3) {
+                        checkUsernameAvailability(e.target.value)
+                      }
+                    }}
+                    className={clsx(
+                      "w-full px-3 py-2 pr-10 border rounded-lg focus:ring-1 focus:ring-brand-500 outline-none",
+                      usernameStatus === 'available' && "border-emerald-300 bg-emerald-50",
+                      usernameStatus === 'taken' && "border-red-300 bg-red-50",
+                      usernameStatus === 'error' && "border-gray-300",
+                      !usernameStatus || usernameStatus === 'idle' ? "border-gray-300" : ""
+                    )}
+                    placeholder="Nombre de usuario (mínimo 3 caracteres)"
+                  />
+                  {/* Status indicator */}
+                  {usernameChecking && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" size={18} />
+                  )}
+                  {!usernameChecking && usernameStatus === 'available' && (
+                    <Check className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
+                  )}
+                  {!usernameChecking && usernameStatus === 'taken' && (
+                    <X className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500" size={18} />
+                  )}
+                </div>
+                {/* Feedback message */}
+                {usernameStatus === 'available' && (
+                  <p className="mt-1 text-xs text-emerald-600">✓ Disponible</p>
+                )}
+                {usernameStatus === 'taken' && (
+                  <p className="mt-1 text-xs text-red-600">✗ Ya está en uso</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email (opcional)</label>
@@ -469,17 +580,30 @@ export default function UsuariosAdminPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR', assignedPharmacies: e.target.value === 'SUPERVISOR' || e.target.value === 'ADMIN' ? formData.assignedPharmacies : [] })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole, assignedPharmacies: e.target.value === UserRole.SUPERVISOR || e.target.value === UserRole.ADMIN ? formData.assignedPharmacies : [] })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                 >
-                  <option value="SUPERVISOR">SUPERVISOR</option>
-                  <option value="ADMIN">ADMIN</option>
-                  {session?.user?.role === 'SUPER_ADMIN' && (
-                    <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                  {creatableRoles.length === 0 ? (
+                    <option value="">No tienes permisos para crear usuarios</option>
+                  ) : (
+                    creatableRoles.map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))
                   )}
                 </select>
               </div>
-              {(formData.role === 'SUPERVISOR' || formData.role === 'ADMIN') && (
+              {/* Selector de Farmacias según rol del creador */}
+              {currentRole === UserRole.ENCARGADO ? (
+                // ENCARGADO: solo puede crear VENDEDOR, mostrar pharmacy asignada como label
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Farmacia Asignada</label>
+                  <div className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700">
+                    {getAssignedPharmacyName()}
+                  </div>
+                  <input type="hidden" name="assignedPharmacies" value={userAssignedPharmacies?.[0] || ''} />
+                </div>
+              ) : (formData.role === UserRole.SUPERVISOR || formData.role === UserRole.ADMIN) && (
+                // ADMIN/SUPERVISOR: mostrar checkboxes para seleccionar farmacias
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Farmacias Asignadas</label>
                   {pharmacies.length === 0 ? (
@@ -569,13 +693,47 @@ export default function UsuariosAdminPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={formData.username}
+                    onChange={(e) => {
+                      setFormData({ ...formData, username: e.target.value })
+                      if (usernameStatus !== 'idle') {
+                        setUsernameStatus('idle')
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value.length >= 3 && e.target.value !== selectedUser?.username) {
+                        checkUsernameAvailability(e.target.value, selectedUser?._id)
+                      }
+                    }}
+                    className={clsx(
+                      "w-full px-3 py-2 pr-10 border rounded-lg focus:ring-1 focus:ring-brand-500 outline-none",
+                      usernameStatus === 'available' && "border-emerald-300 bg-emerald-50",
+                      usernameStatus === 'taken' && "border-red-300 bg-red-50",
+                      !usernameStatus || usernameStatus === 'idle' ? "border-gray-300" : ""
+                    )}
+                  />
+                  {/* Status indicator */}
+                  {usernameChecking && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" size={18} />
+                  )}
+                  {!usernameChecking && usernameStatus === 'available' && (
+                    <Check className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
+                  )}
+                  {!usernameChecking && usernameStatus === 'taken' && (
+                    <X className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500" size={18} />
+                  )}
+                </div>
+                {/* Feedback message */}
+                {usernameStatus === 'available' && (
+                  <p className="mt-1 text-xs text-emerald-600">✓ Disponible</p>
+                )}
+                {usernameStatus === 'taken' && (
+                  <p className="mt-1 text-xs text-red-600">✗ Ya está en uso</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email (opcional)</label>
@@ -590,17 +748,30 @@ export default function UsuariosAdminPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR', assignedPharmacies: e.target.value === 'SUPERVISOR' || e.target.value === 'ADMIN' ? formData.assignedPharmacies : [] })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole, assignedPharmacies: e.target.value === UserRole.SUPERVISOR || e.target.value === UserRole.ADMIN ? formData.assignedPharmacies : [] })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                 >
-                  <option value="SUPERVISOR">SUPERVISOR</option>
-                  <option value="ADMIN">ADMIN</option>
-                  {session?.user?.role === 'SUPER_ADMIN' && (
-                    <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                  {creatableRoles.length === 0 ? (
+                    <option value="">No tienes permisos para crear usuarios</option>
+                  ) : (
+                    creatableRoles.map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))
                   )}
                 </select>
               </div>
-              {(formData.role === 'SUPERVISOR' || formData.role === 'ADMIN') && (
+              {/* Selector de Farmacias según rol del creador en edición */}
+              {currentRole === UserRole.ENCARGADO ? (
+                // ENCARGADO: mostrar pharmacy asignada como label (no editable)
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Farmacia Asignada</label>
+                  <div className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700">
+                    {getAssignedPharmacyName()}
+                  </div>
+                  <input type="hidden" name="assignedPharmacies" value={userAssignedPharmacies?.[0] || ''} />
+                </div>
+              ) : (formData.role === UserRole.SUPERVISOR || formData.role === UserRole.ADMIN) && (
+                // ADMIN/SUPERVISOR: mostrar checkboxes para seleccionar farmacias
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Farmacias Asignadas</label>
                   {pharmacies.length === 0 ? (

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
-import { isSuperAdmin, isAdmin } from '@/lib/roles'
+import { isSuperAdmin, isAdmin, canCreateRole, canManageUsers } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { adminCreateUserSchema } from '@/lib/validations'
 import bcrypt from 'bcryptjs'
@@ -11,7 +11,7 @@ import { z } from 'zod'
 
 // Roles que un ADMIN puede crear (NO puede crear ADMIN ni SUPER_ADMIN)
 // NOTE: PHARMACY ya no es un rol - las farmacias están en colección Pharmacy
-const ADMIN_CAN_CREATE_ROLES = [UserRole.SUPERVISOR]
+// AHORA SE GESTIONA CON canCreateRole() desde lib/roles.ts
 
 export async function GET(req: NextRequest) {
   try {
@@ -57,15 +57,17 @@ export async function POST(req: NextRequest) {
     
     await connectDB()
     
-    // Verificar permisos de creación de roles
-    // SUPER_ADMIN puede crear SUPER_ADMIN, ADMIN, SUPERVISOR
-    // ADMIN puede crear SUPERVISOR (NO ADMIN ni SUPER_ADMIN)
-    // NOTA: PHARMACY ya no es un rol - las farmacias están en colección Pharmacy
-    if (validated.role === UserRole.SUPER_ADMIN && !isSuperAdmin(userRole)) {
-      return NextResponse.json({ error: 'No tienes permisos para crear Super Admin' }, { status: 403 })
+    // Verificar permisos de creación de roles usando canCreateRole
+    // Nota: userRole ya fue declarado al inicio de la función
+    
+    // Verificar que el usuario pueda crear usuarios
+    if (!canManageUsers(userRole)) {
+      return NextResponse.json({ error: 'No tienes permisos para crear usuarios' }, { status: 403 })
     }
-    if (validated.role === UserRole.ADMIN && !isSuperAdmin(userRole)) {
-      return NextResponse.json({ error: 'No tienes permisos para crear Administrador' }, { status: 403 })
+    
+    // Verificar que el rol destino esté dentro de los permisos
+    if (!canCreateRole(userRole, validated.role as UserRole)) {
+      return NextResponse.json({ error: 'No tienes permisos para crear este rol' }, { status: 403 })
     }
 
     // Verificar si el username ya existe

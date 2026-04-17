@@ -7,10 +7,11 @@
 // ---- ENUMS DE ROLES ----
 
 export enum UserRole {
-  SUPER_ADMIN = 'SUPER_ADMIN', // Acceso total a todas las farmacias
-  ADMIN = 'ADMIN',             // Acceso total a todas las farmacias
-  SUPERVISOR = 'SUPERVISOR',   // Acceso limitado a assignedPharmacies
-  // PHARMACY fue movido a colección Pharmacy - ya no es un rol de usuario
+  SUPER_ADMIN = 'SUPER_ADMIN', // Nivel 0 - Acceso total a todas las farmacias
+  ADMIN = 'ADMIN',             // Nivel 1 - Acceso total a todas las farmacias
+  SUPERVISOR = 'SUPERVISOR',   // Nivel 2 - Acceso limitado a assignedPharmacies
+  ENCARGADO = 'ENCARGADO',     // Nivel 3 - Acceso a assignedPharmacy (una sola)
+  VENDEDOR = 'VENDEDOR',       // Nivel 4 - Sin acceso a gestión de farmacias
 }
 
 // ---- MÁQUINA DE ESTADOS: REQUERIMIENTOS DE SUMINISTROS ----

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
-import { isSuperAdmin } from '@/lib/roles'
+import { isSuperAdmin, canEditUser, canManageUsers } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { adminUpdateUserSchema } from '@/lib/validations'
 import { z } from 'zod'
@@ -14,8 +14,11 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    const editorRole = session?.user?.role as UserRole
+    
+    // Verificar que el usuario pueda editar usuarios (no es VENDEDOR)
+    if (!session || !canManageUsers(editorRole)) {
+      return NextResponse.json({ error: 'No autorizado. No tienes permisos para editar usuarios.' }, { status: 403 })
     }
 
     const body = await req.json()
@@ -29,6 +32,14 @@ export async function PATCH(
 
     if (!user) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+    }
+
+    // Si se está intentando cambiar el rol, verificar permisos con canEditUser
+    if (validated.role !== undefined) {
+      const targetRole = validated.role as UserRole
+      if (!canEditUser(editorRole, targetRole)) {
+        return NextResponse.json({ error: 'No tienes permisos para asignar este rol' }, { status: 403 })
+      }
     }
 
     // Actualizar campos
