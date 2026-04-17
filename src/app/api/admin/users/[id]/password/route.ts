@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
-import { isSuperAdmin } from '@/lib/roles'
+import { canManageUsers, canEditUser } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { adminChangePasswordSchema } from '@/lib/validations'
 import bcrypt from 'bcryptjs'
@@ -15,7 +15,7 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+    if (!session || !canManageUsers(session.user.role as UserRole)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
@@ -30,6 +30,11 @@ export async function PATCH(
 
     if (!user) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })
+    }
+
+    // Verificar que el admin no pueda cambiar contraseña de usuarios de nivel superior o igual
+    if (!canEditUser(session.user.role as UserRole, user.role as UserRole)) {
+      return NextResponse.json({ error: 'No tienes permisos para cambiar la contraseña de este usuario' }, { status: 403 })
     }
 
     // Hash de la nueva contraseña

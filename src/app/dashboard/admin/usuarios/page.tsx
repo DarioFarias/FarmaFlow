@@ -251,13 +251,13 @@ export default function UsuariosAdminPage() {
     setFormError(null)
     
     try {
-      // Filtrar campos no vacíos
+      // Filtrar campos que realmente cambiaron (comparar con selectedUser original)
       const updateData: Partial<UserFormData> = {}
-      if (formData.name) updateData.name = formData.name
-      if (formData.username) updateData.username = formData.username
-      if (formData.email) updateData.email = formData.email
-      if (formData.role) updateData.role = formData.role
-      if (formData.phone) updateData.phone = formData.phone
+      if (formData.name !== selectedUser.name) updateData.name = formData.name
+      if (formData.username !== selectedUser.username) updateData.username = formData.username
+      if (formData.email !== selectedUser.email) updateData.email = formData.email
+      if (formData.role !== selectedUser.role) updateData.role = formData.role
+      if (formData.phone !== selectedUser.phone) updateData.phone = formData.phone
       
       // Solo incluir assignedPharmacies si:
       // 1. El usuario actual NO es ENCARGADO (los encargados no pueden editar farmacias)
