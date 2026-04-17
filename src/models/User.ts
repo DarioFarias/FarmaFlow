@@ -88,6 +88,8 @@ const UserSchema = new Schema<IUserDocument>(
 
 // ---- ÍNDICES ----
 // Nota: email y pharmacyCode ya tienen índices por unique: true
+// Username index - case-sensitive (collation con strength: 2)
+UserSchema.index({ username: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } })
 UserSchema.index({ role: 1 })
 UserSchema.index({ isActive: 1 })
 
