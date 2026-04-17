@@ -401,17 +401,10 @@ export default function UsuariosAdminPage() {
                       <span className="text-xs text-gray-500">{u.email}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-4">
-                    <select 
-                      value={u.role}
-                      onChange={(e) => handleUpdateRole(u._id, e.target.value as UserRole)}
-                      disabled={actionId === u._id}
-                      className="text-xs font-semibold bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none focus:ring-1 ring-brand-500"
-                    >
-<option value="SUPERVISOR">SUPERVISOR</option>
-                  <option value="ADMIN">ADMIN</option>
-                      <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-                    </select>
+<td className="py-4 px-4">
+                    <span className="text-xs font-semibold bg-gray-100 text-gray-700 rounded-lg px-2 py-1">
+                      {u.role}
+                    </span>
                   </td>
                   <td className="py-4 px-4 text-sm text-gray-600">
                     {u.assignedPharmacies?.length ? (
