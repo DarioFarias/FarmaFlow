@@ -70,9 +70,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No tienes permisos para crear este rol' }, { status: 403 })
     }
 
-    // Verificar si el username ya existe
+    // Verificar si el username ya existe (case-sensitive)
     if (validated.username) {
-      const existingUsername = await User.findOne({ username: validated.username.toLowerCase() })
+      const existingUsername = await User.findOne({ username: validated.username })
       if (existingUsername) {
         return NextResponse.json({ error: 'El nombre de usuario ya está registrado' }, { status: 400 })
       }
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     // Crear usuario
     const user = await User.create({
       name: validated.name,
-      username: validated.username.toLowerCase().trim(),
+      username: validated.username.trim(),
       email: validated.email ? validated.email.toLowerCase().trim() : undefined,
       password: hashedPassword,
       role: validated.role as UserRole,

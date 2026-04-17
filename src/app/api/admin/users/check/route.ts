@@ -26,8 +26,8 @@ export async function GET(req: NextRequest) {
 
     await connectDB()
 
-    // Verificar si existe usuario con ese username
-    const existing = await User.findOne({ username: username.toLowerCase() })
+    // Verificar si existe usuario con ese username (case-sensitive)
+    const existing = await User.findOne({ username: username })
 
     return NextResponse.json({
       available: !existing,

@@ -34,18 +34,26 @@ export const authOptions: NextAuthOptions = {
 
         await connectDB()
 
-        const input = credentials.username.toLowerCase().trim()
+        const input = credentials.username.trim()
 
-        // 1. Buscar por username primero
+        // 1. Buscar por username (case-sensitive)
         let user = await User.findOne({
           username: input,
           isActive: true,
         }).select('+password').lean() as any
 
-        // 2. Fallback: buscar por email (para usuarios legacy sin username)
+        // 2. Fallback: buscar en lowercase (para usuarios legacy)
         if (!user) {
           user = await User.findOne({
-            email: input,
+            username: input.toLowerCase(),
+            isActive: true,
+          }).select('+password').lean() as any
+        }
+
+        // 3. Fallback adicional: buscar por email
+        if (!user) {
+          user = await User.findOne({
+            email: input.toLowerCase(),
             isActive: true,
           }).select('+password').lean() as any
         }

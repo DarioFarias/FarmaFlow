@@ -45,8 +45,8 @@ export async function PATCH(
     // Actualizar campos
     if (validated.name !== undefined) user.name = validated.name
     if (validated.username !== undefined) {
-      // Verificar que el nuevo username no esté en uso por otro usuario
-      const existingUsername = await User.findOne({ username: validated.username.toLowerCase(), _id: { $ne: id } })
+      // Verificar que el nuevo username no esté en uso por otro usuario (case-sensitive)
+      const existingUsername = await User.findOne({ username: validated.username, _id: { $ne: id } })
       if (existingUsername) {
         return NextResponse.json({ error: 'El nombre de usuario ya está en uso por otro usuario' }, { status: 400 })
       }
