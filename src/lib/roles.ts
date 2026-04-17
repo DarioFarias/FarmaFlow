@@ -25,6 +25,7 @@ export function getRoleLevel(role?: UserRole): number {
 
 /**
  * Obtiene los roles que un usuario puede crear, basados en su rol
+ * Solo SUPER_ADMIN puede crear SUPER_ADMIN
  * @param creatorRole - Rol del usuario que crea
  * @returns Array de roles que puede crear
  */
@@ -35,7 +36,12 @@ export function getCreatableRoles(creatorRole?: UserRole): UserRole[] {
     return [] // VENDEDOR no puede crear nadie
   }
 
-  // Filtrar roles de nivel superior (número mayor)
+  // SUPER_ADMIN (nivel 0) puede crear todos los roles, incluyendo SUPER_ADMIN
+  if (creatorRole === UserRole.SUPER_ADMIN) {
+    return Object.keys(ROLE_HIERARCHY).map(r => r as UserRole)
+  }
+
+  // Para otros roles: solo pueden crear roles de nivel superior (número mayor)
   const creatable = Object.keys(ROLE_HIERARCHY)
     .filter(r => {
       const roleLevel = ROLE_HIERARCHY[r as UserRole]
@@ -48,12 +54,18 @@ export function getCreatableRoles(creatorRole?: UserRole): UserRole[] {
 
 /**
  * Verifica si un rol puede crear otro rol
+ * Solo SUPER_ADMIN puede crear SUPER_ADMIN
  * @param creatorRole - Rol del usuario que crea
  * @param targetRole - Rol objetivo a crear
  * @returns true si puede crear
  */
 export function canCreateRole(creatorRole?: UserRole, targetRole?: UserRole): boolean {
   if (!creatorRole || !targetRole) return false
+  
+  // SUPER_ADMIN puede crear cualquier rol, incluyendo SUPER_ADMIN
+  if (creatorRole === UserRole.SUPER_ADMIN) {
+    return true
+  }
   
   const creatorLevel = getRoleLevel(creatorRole)
   const targetLevel = getRoleLevel(targetRole)
