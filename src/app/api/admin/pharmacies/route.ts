@@ -5,7 +5,7 @@ import connectDB from '@/lib/mongodb'
 import Pharmacy from '@/models/Pharmacy'
 import { isSuperAdmin, isAdmin, isSupervisor } from '@/lib/roles'
 import { UserRole } from '@/types'
-import { pharmacyCreateSchema } from '@/lib/validations'
+import { pharmacyCreateSchema, sanitizeSearchInput, paginationParams } from '@/lib/validations'
 import { z } from 'zod'
 
 export async function GET(req: NextRequest) {
@@ -17,23 +17,40 @@ export async function GET(req: NextRequest) {
     }
 
     await connectDB()
-    
+
     const { searchParams } = new URL(req.url)
+
+    // Sanitizar y validar parámetros de paginación
+    const pagination = paginationParams.safeParse({
+      page: searchParams.get('page') || '1',
+      pageSize: searchParams.get('pageSize') || '20',
+    })
+    const { page, pageSize } = pagination.success ? pagination.data : { page: 1, pageSize: 20 }
+
+    // Sanitizar search query
+    const searchQuery = searchParams.get('search')
+    const sanitizedSearch = searchQuery ? sanitizeSearchInput(searchQuery) : undefined
+
+    // Sanitizar active filter
     const activeFilter = searchParams.get('active')
-    
+    const sanitizedActiveFilter = activeFilter === 'true' ? true : activeFilter === 'false' ? false : undefined
+
     let query: Record<string, unknown> = {}
-    if (activeFilter === 'true') {
-      query = { isActive: true }
-    } else if (activeFilter === 'false') {
-      query = { isActive: false }
+    if (sanitizedActiveFilter !== undefined) {
+      query.isActive = sanitizedActiveFilter
     }
-    
+
+    // Aplicar búsqueda por nombre si existe
+    if (sanitizedSearch) {
+      query.pharmacyName = { $regex: sanitizedSearch, $options: 'i' }
+    }
+
     // Si es SUPERVISOR, solo puede ver las farmacias asignadas
     if (isSupervisor(userRole)) {
       const assignedPharmacies = (session.user as any).assignedPharmacies || []
       if (assignedPharmacies.length > 0) {
         // Buscar pharmacies por assignedPharmacies (pharmacyCode en la colección Pharmacy)
-        const assignedPharmaciesDocs = await Pharmacy.find({ 
+        const assignedPharmaciesDocs = await Pharmacy.find({
           pharmacyCode: { $in: assignedPharmacies },
         }).select('_id')
         const pharmacyIds = assignedPharmaciesDocs.map(p => p._id)
@@ -43,10 +60,23 @@ export async function GET(req: NextRequest) {
         query._id = { $in: [] }
       }
     }
-    
-    const pharmacies = await Pharmacy.find(query).sort({ pharmacyName: 1 })
-    
-    return NextResponse.json(pharmacies)
+
+    // Ejecutar query con paginación
+    const skip = (page - 1) * pageSize
+    const [pharmacies, total] = await Promise.all([
+      Pharmacy.find(query).sort({ pharmacyName: 1 }).skip(skip).limit(pageSize),
+      Pharmacy.countDocuments(query),
+    ])
+
+    const totalPages = Math.ceil(total / pageSize)
+
+    return NextResponse.json({
+      data: pharmacies,
+      total,
+      page,
+      limit: pageSize,
+      totalPages,
+    })
   } catch (error) {
     console.error('Error fetching pharmacies:', error)
     return NextResponse.json({ error: 'Error al obtener farmacias' }, { status: 500 })

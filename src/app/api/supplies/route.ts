@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import SupplyRequest from '@/models/SupplyRequest'
-import { createSupplyRequestSchema } from '@/lib/validations'
+import { createSupplyRequestSchema, paginationParams } from '@/lib/validations'
 import { UserRole, SupplyRequestStatus } from '@/types'
 
 // =============================================
@@ -14,7 +14,7 @@ import { UserRole, SupplyRequestStatus } from '@/types'
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
@@ -67,10 +67,18 @@ export async function GET(req: NextRequest) {
 
     await connectDB()
 
+    // Sanitizar y validar parámetros de paginación
+    const { searchParams } = new URL(req.url)
+    const pagination = paginationParams.safeParse({
+      page: searchParams.get('page') || '1',
+      pageSize: searchParams.get('pageSize') || '20',
+    })
+    const { page, pageSize } = pagination.success ? pagination.data : { page: 1, pageSize: 20 }
+
     let query: Record<string, unknown> = {}
     const userRole = session.user.role as UserRole
     const userId = session.user.id
-    
+
     // Si es rol legacy (antigua farmacia), solo ve sus propios pedidos
     // PHARMACY ya no existe como enum, cualquier rol no-admin/supervisor es farmacia
     if (userRole !== UserRole.ADMIN && userRole !== UserRole.SUPER_ADMIN && userRole !== UserRole.SUPERVISOR) {
@@ -82,7 +90,7 @@ export async function GET(req: NextRequest) {
       if (assignedPharmacies.length > 0) {
         // Filtar por pharmacyCode en la colección Pharmacy (no en User)
         const { default: Pharmacy } = await import('@/models/Pharmacy')
-        const assignedPharmaciesDocs = await Pharmacy.find({ 
+        const assignedPharmaciesDocs = await Pharmacy.find({
           pharmacyCode: { $in: assignedPharmacies },
           isActive: true
         }).select('_id')
@@ -94,11 +102,25 @@ export async function GET(req: NextRequest) {
     }
     // Si es ADMIN o SUPER_ADMIN, ve todos los pedidos
 
-    const requests = await SupplyRequest.find(query)
-      .sort({ createdAt: -1 })
-      .limit(50)
+    // Ejecutar query con paginación
+    const skip = (page - 1) * pageSize
+    const [requests, total] = await Promise.all([
+      SupplyRequest.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize),
+      SupplyRequest.countDocuments(query),
+    ])
 
-    return NextResponse.json(requests)
+    const totalPages = Math.ceil(total / pageSize)
+
+    return NextResponse.json({
+      data: requests,
+      total,
+      page,
+      limit: pageSize,
+      totalPages,
+    })
   } catch (error) {
     console.error('API_SUPPLIES_GET_ERROR:', error)
     return NextResponse.json(

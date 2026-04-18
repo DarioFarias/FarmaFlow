@@ -6,6 +6,29 @@ import User from '@/models/User'
 import { UserRole } from '@/types'
 import { isAdmin as checkIsAdmin } from './roles'
 
+// Tipo para usuario retornar en authorize (compatible con next-auth)
+interface AuthorizeUser {
+  id: string
+  name: string
+  email?: string | null
+  username: string | null
+  role: UserRole
+  profileImage?: string
+  assignedPharmacies: string[]
+}
+
+// Tipo para resultado de lean queries (compatible con mongoose moderno)
+type LeanUser = {
+  _id: { toString(): string }
+  name: string
+  email?: string | null
+  username?: string | null
+  password: string
+  role: string  // Viene como string desde la DB
+  profileImage?: string
+  assignedPharmacies?: string[]
+}
+
 // =============================================
 // FARMAFLOW - Configuración de NextAuth.js
 // RBAC: roles ADMIN (Supervisor), SUPER_ADMIN y SUPERVISOR
@@ -37,17 +60,17 @@ export const authOptions: NextAuthOptions = {
         const input = credentials.username.trim()
 
         // 1. Buscar por username (case-sensitive)
-        let user = await User.findOne({
+        let user: LeanUser | null = await User.findOne({
           username: input,
           isActive: true,
-        }).select('+password').lean() as any
+        }).select('+password').lean() as LeanUser | null
 
         // 2. Fallback: buscar en lowercase (para usuarios legacy)
         if (!user) {
           user = await User.findOne({
             username: input.toLowerCase(),
             isActive: true,
-          }).select('+password').lean() as any
+          }).select('+password').lean() as LeanUser | null
         }
 
         // 3. Fallback adicional: buscar por email
@@ -55,7 +78,7 @@ export const authOptions: NextAuthOptions = {
           user = await User.findOne({
             email: input.toLowerCase(),
             isActive: true,
-          }).select('+password').lean() as any
+          }).select('+password').lean() as LeanUser | null
         }
 
         if (!user) {
@@ -76,7 +99,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           email: user.email,
           username: user.username || null, // null para usuarios legacy
-          role: user.role,
+          role: user.role as UserRole,
           profileImage: user.profileImage,
           assignedPharmacies: user.assignedPharmacies || [],
         }
@@ -88,10 +111,10 @@ export const authOptions: NextAuthOptions = {
       // Persistir datos extra en el JWT al hacer login
       if (user) {
         token.id = user.id
-        token.role = (user as { role: UserRole }).role
-        token.profileImage = (user as any).profileImage
-        token.assignedPharmacies = (user as any).assignedPharmacies || []
-        token.username = (user as any).username || null // null para usuarios legacy
+        token.role = (user as AuthorizeUser).role as UserRole
+        token.profileImage = (user as AuthorizeUser).profileImage
+        token.assignedPharmacies = (user as AuthorizeUser).assignedPharmacies || []
+        token.username = (user as AuthorizeUser).username || null // null para usuarios legacy
       }
       return token
     },

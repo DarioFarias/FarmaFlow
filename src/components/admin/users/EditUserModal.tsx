@@ -1,0 +1,291 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { UserRole, IUser, IPharmacy } from '@/types'
+import { X, Loader2, Check } from 'lucide-react'
+import clsx from 'clsx'
+import toast from 'react-hot-toast'
+import PharmacyCheckboxGroup from './PharmacyCheckboxGroup'
+
+type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error'
+
+interface UserFormData {
+  name: string
+  username: string
+  email: string
+  password: string
+  role: UserRole
+  phone: string
+  assignedPharmacies: string[]
+}
+
+interface EditUserModalProps {
+  isOpen: boolean
+  user: IUser | null
+  onClose: () => void
+  creatableRoles: UserRole[]
+  currentRole: UserRole | undefined
+  userAssignedPharmacies: string[] | undefined
+  pharmacies: IPharmacy[]
+  onSuccess: () => void
+}
+
+export default function EditUserModal({
+  isOpen,
+  user,
+  onClose,
+  creatableRoles,
+  currentRole,
+  userAssignedPharmacies,
+  pharmacies,
+  onSuccess,
+}: EditUserModalProps) {
+  const [formData, setFormData] = useState<UserFormData>({
+    name: '',
+    username: '',
+    email: '',
+    password: '',
+    role: UserRole.SUPERVISOR,
+    phone: '',
+    assignedPharmacies: [],
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle')
+  const [usernameChecking, setUsernameChecking] = useState(false)
+
+  useEffect(() => {
+    if (user && isOpen) {
+      setFormData({
+        name: user.name,
+        username: user.username || '',
+        email: user.email || '',
+        password: '',
+        role: user.role as UserRole,
+        phone: user.phone || '',
+        assignedPharmacies: user.assignedPharmacies || [],
+      })
+      setUsernameStatus('idle')
+    }
+  }, [user, isOpen])
+
+  const getAssignedPharmacyName = () => {
+    if (!userAssignedPharmacies || userAssignedPharmacies.length === 0) return 'Sin asignar'
+    const pharmacy = pharmacies.find(p => p._id === userAssignedPharmacies[0])
+    return pharmacy?.pharmacyName || userAssignedPharmacies[0]
+  }
+
+  const checkUsernameAvailability = async (username: string, excludeUserId?: string) => {
+    if (!username || username.length < 3) {
+      setUsernameStatus('idle')
+      return
+    }
+    
+    setUsernameStatus('checking')
+    setUsernameChecking(true)
+    
+    try {
+      const res = await fetch(`/api/admin/users/check?username=${encodeURIComponent(username)}`)
+      const data = await res.json()
+      
+      if (!res.ok) {
+        setUsernameStatus('error')
+        toast.error('Error al verificar usuario')
+        return
+      }
+      
+      setUsernameStatus(data.available ? 'available' : 'taken')
+    } catch (error) {
+      console.error('Username check error:', error)
+      setUsernameStatus('error')
+    } finally {
+      setUsernameChecking(false)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+    setIsSubmitting(true)
+    setFormError(null)
+    
+    const updateData: Partial<UserFormData> = {}
+    if (formData.name !== user.name) updateData.name = formData.name
+    if (formData.username !== user.username) updateData.username = formData.username
+    if (formData.email !== user.email) updateData.email = formData.email
+    if (formData.role !== user.role) updateData.role = formData.role
+    if (formData.phone !== user.phone) updateData.phone = formData.phone
+    
+    if (currentRole !== UserRole.ENCARGADO) {
+      const targetRoleToEdit = formData.role
+      if (targetRoleToEdit === UserRole.SUPERVISOR || targetRoleToEdit === UserRole.ADMIN) {
+        updateData.assignedPharmacies = formData.assignedPharmacies
+      }
+    }
+
+    try {
+      const res = await fetch(`/api/admin/users/${user._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      })
+      
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || data.details || 'Error al actualizar usuario')
+      
+      toast.success('Usuario actualizado correctamente')
+      onSuccess()
+      onClose()
+    } catch (error: any) {
+      setFormError(error.message || 'Error al actualizar usuario')
+      toast.error(error.message || 'Error al actualizar usuario')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (!isOpen || !user) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-lg font-semibold">Editar Usuario</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+            <div className="relative">
+              <input
+                type="text"
+                required
+                value={formData.username}
+                onChange={(e) => {
+                  setFormData({ ...formData, username: e.target.value })
+                  if (usernameStatus !== 'idle') setUsernameStatus('idle')
+                }}
+                onBlur={(e) => {
+                  if (e.target.value.length >= 3 && e.target.value !== user?.username) {
+                    checkUsernameAvailability(e.target.value, user?._id)
+                  }
+                }}
+                className={clsx(
+                  "w-full px-3 py-2 pr-10 border rounded-lg focus:ring-1 focus:ring-brand-500 outline-none",
+                  usernameStatus === 'available' && "border-emerald-300 bg-emerald-50",
+                  usernameStatus === 'taken' && "border-red-300 bg-red-50",
+                  !usernameStatus || usernameStatus === 'idle' ? "border-gray-300" : ""
+                )}
+              />
+              {usernameChecking && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" size={18} />
+              )}
+              {!usernameChecking && usernameStatus === 'available' && (
+                <Check className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
+              )}
+              {!usernameChecking && usernameStatus === 'taken' && (
+                <X className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500" size={18} />
+              )}
+            </div>
+            {usernameStatus === 'available' && (
+              <p className="mt-1 text-xs text-emerald-600">✓ Disponible</p>
+            )}
+            {usernameStatus === 'taken' && (
+              <p className="mt-1 text-xs text-red-600">✗ Ya está en uso</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email (opcional)</label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                role: e.target.value as UserRole, 
+                assignedPharmacies: e.target.value === UserRole.SUPERVISOR || e.target.value === UserRole.ADMIN ? formData.assignedPharmacies : [] 
+              })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+            >
+              {creatableRoles.length === 0 ? (
+                <option value="">No tienes permisos para crear usuarios</option>
+              ) : (
+                creatableRoles.map((role) => (
+                  <option key={role} value={role}>{role}</option>
+                ))
+              )}
+            </select>
+          </div>
+          {currentRole === UserRole.ENCARGADO ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Farmacia Asignada</label>
+              <div className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700">
+                {getAssignedPharmacyName()}
+              </div>
+              <input type="hidden" name="assignedPharmacies" value={userAssignedPharmacies?.[0] || ''} />
+            </div>
+          ) : (formData.role === UserRole.SUPERVISOR || formData.role === UserRole.ADMIN) && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Farmacias Asignadas</label>
+              <PharmacyCheckboxGroup
+                pharmacies={pharmacies}
+                selected={formData.assignedPharmacies}
+                onChange={(selected) => setFormData({ ...formData, assignedPharmacies: selected })}
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+            <input
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+            />
+          </div>
+          {formError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {formError}
+            </div>
+          )}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? <Loader2 className="animate-spin mx-auto" size={18} /> : 'Guardar Cambios'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

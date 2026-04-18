@@ -11,7 +11,63 @@ import {
 // Fuente única para validación de API y formularios (client + server)
 // =============================================
 
+// ---- SCHEMAS DE SANITIZACIÓN (Security) ----
+
+// Regex para sanitizar strings: permite solo letras, números, espacios, guiones
+export const SANITIZE_REGEX = /[^a-zA-Z0-9\s\-_áéíóúñÁÉÍÓÚÑ]/g
+
+// Regex más permisivo para search (más flexible)
+export const SEARCH_SANITIZE_REGEX = /[^a-zA-Z0-9\s\-_áéíóúñÁÉÍÓÚÑ']/g
+
+/**
+ * Sanitiza cualquier input de usuario
+ * - Remueve tags HTML/JS
+ * - Remueve caracteres especiales problemáticos
+ * - Trim espacios
+ */
+export function sanitizeInput(input: string): string {
+  if (!input || typeof input !== 'string') return ''
+
+  return input
+    // Remover tags HTML
+    .replace(/<[^>]*>/g, '')
+    // Remover comillas (previene SQL injection básico)
+    .replace(/['"]/g, '')
+    // Remover caracteres especiales (incluye símbolos de operador)
+    .replace(SANITIZE_REGEX, '')
+    // Normalizar espacios
+    .replace(/\s+/g, ' ')
+    // Trim
+    .trim()
+}
+
+/**
+ * Sanitiza search query inputs (más permisivo para búsquedas)
+ */
+export function sanitizeSearchInput(input: string): string {
+  if (!input || typeof input !== 'string') return ''
+
+  // Truncar a max 100 caracteres
+  let sanitized = input.slice(0, 100)
+    // Remover tags
+    .replace(/<[^>]*>/g, '')
+    // Remover comillas simples y dobles
+    .replace(/['"]/g, '')
+    // Remover comentarios SQL (--)
+    .replace(/--/g, '')
+    // Remover caracteres especiales peligrosos
+    .replace(/[^\w\s\-_áéíóúñÁÉÍÓÚÑ]/g, '')
+    // Normalizar espacios múltiples
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return sanitized
+}
+
 // ---- FARMACIAS ----
+
+// Validar que pharmacyId sea un ObjectId válido de MongoDB
+const mongoObjectIdRegex = /^[a-fA-F0-9]{24}$/
 
 export const pharmacyCreateSchema = z.object({
   pharmacyName: z.string()
@@ -118,6 +174,16 @@ export const updateExpenseStatusSchema = z.object({
   status: z.nativeEnum(ExpenseStatus),
   adminComment: z.string().max(1000).optional(),
 })
+
+// ---- PAGINATION ----
+
+// Schema para parámetros de paginación
+export const paginationParams = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+})
+
+export type PaginationParams = z.infer<typeof paginationParams>
 
 // ---- Tipos inferidos desde Zod ----
 export type LoginInput = z.infer<typeof loginSchema>

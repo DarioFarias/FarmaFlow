@@ -5,7 +5,7 @@ import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import { isSuperAdmin, isAdmin, canCreateRole, canManageUsers } from '@/lib/roles'
 import { UserRole } from '@/types'
-import { adminCreateUserSchema } from '@/lib/validations'
+import { adminCreateUserSchema, paginationParams } from '@/lib/validations'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 
@@ -21,18 +21,40 @@ export async function GET(req: NextRequest) {
     }
 
     await connectDB()
-    
+
+    // Sanitizar y validar parámetros de paginación
     const { searchParams } = new URL(req.url)
+    const pagination = paginationParams.safeParse({
+      page: searchParams.get('page') || '1',
+      pageSize: searchParams.get('pageSize') || '20',
+    })
+    const { page, pageSize } = pagination.success ? pagination.data : { page: 1, pageSize: 20 }
+
+    // Sanitizar role filter
     const roleFilter = searchParams.get('role')
-    
+    const sanitizedRole = roleFilter && ['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN', 'ENCARGADO', 'VENDEDOR'].includes(roleFilter) ? roleFilter : undefined
+
     let query = {}
-    if (roleFilter) {
-      query = { role: roleFilter }
+    if (sanitizedRole) {
+      query = { role: sanitizedRole }
     }
-    
-    const users = await User.find(query).sort({ createdAt: -1 })
-    
-    return NextResponse.json(users)
+
+    // Ejecutar query con paginación
+    const skip = (page - 1) * pageSize
+    const [users, total] = await Promise.all([
+      User.find(query).sort({ createdAt: -1 }).skip(skip).limit(pageSize),
+      User.countDocuments(query),
+    ])
+
+    const totalPages = Math.ceil(total / pageSize)
+
+    return NextResponse.json({
+      data: users,
+      total,
+      page,
+      limit: pageSize,
+      totalPages,
+    })
   } catch (error) {
     return NextResponse.json({ error: 'Error al obtener usuarios' }, { status: 500 })
   }

@@ -5,23 +5,50 @@ import { Package, Receipt, Users, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import connectDB from '@/lib/mongodb'
 import Pharmacy from '@/models/Pharmacy'
-// import SupplyRequest from '@/models/SupplyRequest'
-// import Expense from '@/models/Expense'
 
 export const dynamic = 'force-dynamic'
+
+// Stat card definitions - extracted outside component
+const STAT_CARDS_BASE = [
+  { label: 'Pedidos activos', value: '0', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-100' },
+  { label: 'Gastos pendientes', value: '0', icon: Receipt, color: 'text-orange-600', bg: 'bg-orange-50', ring: 'ring-orange-100' },
+]
+
+const STAT_CARDS_ADMIN = [
+  { label: 'Farmacias activas', value: '0', icon: Users, color: 'text-brand-600', bg: 'bg-brand-50', ring: 'ring-brand-100' },
+  { label: 'Crecimiento', value: '+14%', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'ring-emerald-100' },
+]
+
+function StatCard({ stat, value }: { stat: typeof STAT_CARDS_BASE[0]; value: string }) {
+  const Icon = stat.icon
+  return (
+    <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition-shadow">
+      <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500`}>
+        <Icon size={80} className={stat.color} />
+      </div>
+      <div className={`inline-flex ${stat.bg} ${stat.color} ring-1 ${stat.ring} p-2.5 rounded-lg mb-4`}>
+        <Icon size={20} />
+      </div>
+      <div>
+        <p className="text-3xl font-bold text-gray-900 mb-1">{value}</p>
+        <p className="text-sm font-medium text-gray-500">{stat.label}</p>
+      </div>
+    </div>
+  )
+}
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
   const isAdmin = session?.user.role === UserRole.ADMIN || session?.user.role === UserRole.SUPER_ADMIN
 
-  await connectDB()
+  // Fetch pharmacy count only for admins
+  const pharmaciesCount = isAdmin ? await (await connectDB(), Pharmacy.countDocuments({ isActive: true })) : 0
 
-  // Conteo real si es Admin - contar de la colección Pharmacy
-  const farmaciasCount = isAdmin ? await Pharmacy.countDocuments({ isActive: true }) : 0
-  
-  // Próximamente traeremos esto de la DB
-  const activeSupplyCount = 0
-  const pendingExpenseCount = 0
+  // Build stat cards based on role - avoids recreating on each render
+  const statCards = [
+    ...STAT_CARDS_BASE.map(s => ({ ...s, value: s.label === 'Pedidos activos' ? '0' : '0' })),
+    ...(isAdmin ? STAT_CARDS_ADMIN.map(s => ({ ...s, value: s.label === 'Farmacias activas' ? pharmaciesCount.toString() : s.value })) : []),
+  ]
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -41,28 +68,8 @@ export default async function DashboardPage() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        {[
-          { label: 'Pedidos activos', value: activeSupplyCount.toString(), icon: Package, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-100' },
-          { label: 'Gastos pendientes', value: pendingExpenseCount.toString(), icon: Receipt, color: 'text-orange-600', bg: 'bg-orange-50', ring: 'ring-orange-100' },
-          ...(isAdmin
-            ? [
-                { label: 'Farmacias activas', value: farmaciasCount.toString(), icon: Users, color: 'text-brand-600', bg: 'bg-brand-50', ring: 'ring-brand-100' },
-                { label: 'Crecimiento', value: '+14%', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'ring-emerald-100' },
-              ]
-            : []),
-        ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition-shadow">
-            <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 group-hover:opacity-20 transition-all duration-500`}>
-              <stat.icon size={80} className={stat.color} />
-            </div>
-            <div className={`inline-flex ${stat.bg} ${stat.color} ring-1 ${stat.ring} p-2.5 rounded-lg mb-4`}>
-              <stat.icon size={20} />
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</p>
-              <p className="text-sm font-medium text-gray-500">{stat.label}</p>
-            </div>
-          </div>
+        {statCards.map((stat) => (
+          <StatCard key={stat.label} stat={stat} value={stat.value} />
         ))}
       </div>
 
