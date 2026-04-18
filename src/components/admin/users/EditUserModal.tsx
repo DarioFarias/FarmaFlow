@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { UserRole, IUser, IPharmacy } from '@/types'
 import { X, Loader2, Check } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import PharmacyCheckboxGroup from './PharmacyCheckboxGroup'
+import { getPharmacyAssignmentType } from '@/lib/roles'
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error'
 
@@ -54,6 +55,15 @@ export default function EditUserModal({
   const [formError, setFormError] = useState<string | null>(null)
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle')
   const [usernameChecking, setUsernameChecking] = useState(false)
+
+  // Determinar el tipo de asignación de farmacias según el rol seleccionado
+  const assignmentType = useMemo(() => 
+    getPharmacyAssignmentType(formData.role), 
+    [formData.role]
+  )
+
+  // Determinar si el usuario actual (editor) es ENCARGADO
+  const isEditorEncargado = currentRole === UserRole.ENCARGADO
 
   useEffect(() => {
     if (user && isOpen) {
@@ -118,12 +128,18 @@ export default function EditUserModal({
     if (formData.role !== user.role) updateData.role = formData.role
     if (formData.phone !== user.phone) updateData.phone = formData.phone
     
-    if (currentRole !== UserRole.ENCARGADO) {
-      const targetRoleToEdit = formData.role
-      if (targetRoleToEdit === UserRole.SUPERVISOR || targetRoleToEdit === UserRole.ADMIN) {
-        updateData.assignedPharmacies = formData.assignedPharmacies
+    // Enviar assignedPharmacies según el tipo de asignación del rol destino
+    const targetAssignmentType = getPharmacyAssignmentType(formData.role)
+    if (targetAssignmentType === 'multiple') {
+      // SUPERVISOR: enviar todas las seleccionadas
+      updateData.assignedPharmacies = formData.assignedPharmacies
+    } else if (targetAssignmentType === 'single') {
+      // ENCARGADO/VENDEDOR: enviar solo una
+      if (formData.assignedPharmacies.length > 0) {
+        updateData.assignedPharmacies = [formData.assignedPharmacies[0]]
       }
     }
+    // assignmentType === 'none' (ADMIN/SUPER_ADMIN): no enviar assignedPharmacies
 
     try {
       const res = await fetch(`/api/admin/users/${user._id}`, {
@@ -221,11 +237,24 @@ export default function EditUserModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
             <select
               value={formData.role}
-              onChange={(e) => setFormData({ 
-                ...formData, 
-                role: e.target.value as UserRole, 
-                assignedPharmacies: e.target.value === UserRole.SUPERVISOR || e.target.value === UserRole.ADMIN ? formData.assignedPharmacies : [] 
-              })}
+              onChange={(e) => {
+                const newRole = e.target.value as UserRole
+                const newAssignmentType = getPharmacyAssignmentType(newRole)
+                
+                // Si el nuevo rol no permite farmacias, limpiar la selección
+                let newPharmacies = formData.assignedPharmacies
+                if (newAssignmentType === 'none') {
+                  newPharmacies = []
+                } else if (newAssignmentType === 'single' && formData.assignedPharmacies.length > 1) {
+                  newPharmacies = [formData.assignedPharmacies[0]]
+                }
+                
+                setFormData({ 
+                  ...formData, 
+                  role: newRole,
+                  assignedPharmacies: newPharmacies
+                })
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
             >
               {creatableRoles.length === 0 ? (
@@ -237,15 +266,8 @@ export default function EditUserModal({
               )}
             </select>
           </div>
-          {currentRole === UserRole.ENCARGADO ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Farmacia Asignada</label>
-              <div className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700">
-                {getAssignedPharmacyName()}
-              </div>
-              <input type="hidden" name="assignedPharmacies" value={userAssignedPharmacies?.[0] || ''} />
-            </div>
-          ) : (formData.role === UserRole.SUPERVISOR || formData.role === UserRole.ADMIN) && (
+          {/* Campo de asignación de farmacias según el tipo */}
+          {assignmentType === 'multiple' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Farmacias Asignadas</label>
               <PharmacyCheckboxGroup
@@ -255,6 +277,35 @@ export default function EditUserModal({
               />
             </div>
           )}
+          {assignmentType === 'single' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Farmacia Asignada</label>
+              {isEditorEncargado ? (
+                // ENCARGADO editando: solo puede ver su propia farmacia (readonly)
+                <>
+                  <div className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700">
+                    {getAssignedPharmacyName()}
+                  </div>
+                  <input type="hidden" name="assignedPharmacies" value={userAssignedPharmacies?.[0] || ''} />
+                </>
+              ) : (
+                // Otro rol (SUPERVISOR/ADMIN) editando: dropdown para seleccionar
+                <select
+                  value={formData.assignedPharmacies[0] || ''}
+                  onChange={(e) => setFormData({ ...formData, assignedPharmacies: e.target.value ? [e.target.value] : [] })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+                >
+                  <option value="">Seleccionar farmacia</option>
+                  {pharmacies.map((pharmacy) => (
+                    <option key={pharmacy._id} value={pharmacy._id}>
+                      {pharmacy.pharmacyName}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+          {/* assignmentType === 'none' no muestra nada (ADMIN/SUPER_ADMIN) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
             <input

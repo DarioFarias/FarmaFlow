@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
-import { isSuperAdmin, canEditUser, canManageUsers } from '@/lib/roles'
+import { isSuperAdmin, canEditUser, canManageUsers, validatePharmacyAssignment } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { adminUpdateUserSchema } from '@/lib/validations'
 import { z } from 'zod'
@@ -39,6 +39,21 @@ export async function PATCH(
       const targetRole = validated.role as UserRole
       if (!canEditUser(editorRole, targetRole)) {
         return NextResponse.json({ error: 'No tienes permisos para asignar este rol' }, { status: 403 })
+      }
+    }
+
+    // Validar asignación de farmacias según el rol del editor y del destino
+    // Usar el rol destino (el actual si no se está cambiando, o el nuevo si se cambia)
+    const targetRole = (validated.role as UserRole) || user.role
+    if (validated.assignedPharmacies !== undefined) {
+      const pharmacyValidation = validatePharmacyAssignment(
+        targetRole,
+        validated.assignedPharmacies,
+        editorRole,
+        session.user.assignedPharmacies
+      )
+      if (!pharmacyValidation.valid) {
+        return NextResponse.json({ error: pharmacyValidation.error }, { status: 400 })
       }
     }
 

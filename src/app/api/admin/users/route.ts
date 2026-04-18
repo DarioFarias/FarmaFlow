@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
-import { isSuperAdmin, isAdmin, canCreateRole, canManageUsers } from '@/lib/roles'
+import { isSuperAdmin, isAdmin, canCreateRole, canManageUsers, validatePharmacyAssignment } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { adminCreateUserSchema, paginationParams } from '@/lib/validations'
 import bcrypt from 'bcryptjs'
@@ -88,6 +88,17 @@ export async function POST(req: NextRequest) {
     // Verificar que el rol destino esté dentro de los permisos
     if (!canCreateRole(userRole, validated.role as UserRole)) {
       return NextResponse.json({ error: 'No tienes permisos para crear este rol' }, { status: 403 })
+    }
+
+    // Validar asignación de farmacias según el rol del creador y del destino
+    const pharmacyValidation = validatePharmacyAssignment(
+      validated.role as UserRole,
+      validated.assignedPharmacies,
+      userRole,
+      session.user.assignedPharmacies
+    )
+    if (!pharmacyValidation.valid) {
+      return NextResponse.json({ error: pharmacyValidation.error }, { status: 400 })
     }
 
     // Verificar si el username ya existe (case-sensitive)

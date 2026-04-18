@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { UserRole, IPharmacy } from '@/types'
 import { X, Loader2, Check } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import PharmacyCheckboxGroup from './PharmacyCheckboxGroup'
+import { getPharmacyAssignmentType, PharmacyAssignmentType } from '@/lib/roles'
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error'
 
@@ -54,6 +55,22 @@ export default function CreateUserModal({
   const [formError, setFormError] = useState<string | null>(null)
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle')
   const [usernameChecking, setUsernameChecking] = useState(false)
+
+  // Determinar el tipo de asignación de farmacias según el rol seleccionado
+  const assignmentType = useMemo(() => 
+    getPharmacyAssignmentType(formData.role), 
+    [formData.role]
+  )
+
+  // Determinar si el usuario actual (creador) es ENCARGADO
+  const isCreatorEncargado = currentRole === UserRole.ENCARGADO
+  
+  // Determinar si el creador (ENCARGADO) tiene farmacia asignada
+  const creatorHasPharmacy = userAssignedPharmacies && userAssignedPharmacies.length > 0
+
+  // Determinar si se puede seleccionar rol VENDEDOR
+  // Solo si el creador NO es ENCARGADO, o si es ENCARGADO pero tiene farmacia
+  const canSelectVendorRole = !isCreatorEncargado || creatorHasPharmacy
 
   const getAssignedPharmacyName = () => {
     if (!userAssignedPharmacies || userAssignedPharmacies.length === 0) return 'Sin asignar'
@@ -226,11 +243,24 @@ export default function CreateUserModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
             <select
               value={formData.role}
-              onChange={(e) => setFormData({ 
-                ...formData, 
-                role: e.target.value as UserRole, 
-                assignedPharmacies: e.target.value === UserRole.SUPERVISOR || e.target.value === UserRole.ADMIN ? formData.assignedPharmacies : [] 
-              })}
+              onChange={(e) => {
+                const newRole = e.target.value as UserRole
+                const newAssignmentType = getPharmacyAssignmentType(newRole)
+                
+                // Si el nuevo rol no permite farmacias, limpiar la selección
+                let newPharmacies = formData.assignedPharmacies
+                if (newAssignmentType === 'none') {
+                  newPharmacies = []
+                } else if (newAssignmentType === 'single' && formData.assignedPharmacies.length > 1) {
+                  newPharmacies = [formData.assignedPharmacies[0]]
+                }
+                
+                setFormData({ 
+                  ...formData, 
+                  role: newRole,
+                  assignedPharmacies: newPharmacies
+                })
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
             >
               {creatableRoles.length === 0 ? (
@@ -242,15 +272,8 @@ export default function CreateUserModal({
               )}
             </select>
           </div>
-          {currentRole === UserRole.ENCARGADO ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Farmacia Asignada</label>
-              <div className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700">
-                {getAssignedPharmacyName()}
-              </div>
-              <input type="hidden" name="assignedPharmacies" value={userAssignedPharmacies?.[0] || ''} />
-            </div>
-          ) : (formData.role === UserRole.SUPERVISOR || formData.role === UserRole.ADMIN) && (
+          {/* Campo de asignación de farmacias según el tipo */}
+          {assignmentType === 'multiple' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Farmacias Asignadas</label>
               <PharmacyCheckboxGroup
@@ -260,6 +283,39 @@ export default function CreateUserModal({
               />
             </div>
           )}
+          {assignmentType === 'single' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {formData.role === UserRole.VENDEDOR && isCreatorEncargado 
+                  ? 'Farmacia Asignada (solo puedes asignar tu misma farmacia)' 
+                  : 'Farmacia Asignada'}
+              </label>
+              {formData.role === UserRole.VENDEDOR && isCreatorEncargado ? (
+                // VENDEDOR creado por ENCARGADO: solo puede ver su propia farmacia (readonly)
+                <>
+                  <div className="px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700">
+                    {getAssignedPharmacyName()}
+                  </div>
+                  <input type="hidden" name="assignedPharmacies" value={userAssignedPharmacies?.[0] || ''} />
+                </>
+              ) : (
+                // ENCARGADO o VENDEDOR creado por SUPERVISOR/SUPER_ADMIN: dropdown para seleccionar
+                <select
+                  value={formData.assignedPharmacies[0] || ''}
+                  onChange={(e) => setFormData({ ...formData, assignedPharmacies: e.target.value ? [e.target.value] : [] })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
+                >
+                  <option value="">Seleccionar farmacia</option>
+                  {pharmacies.map((pharmacy) => (
+                    <option key={pharmacy._id} value={pharmacy._id}>
+                      {pharmacy.pharmacyName}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+          {/* assignmentType === 'none' no muestra nada (ADMIN/SUPER_ADMIN) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
             <input
