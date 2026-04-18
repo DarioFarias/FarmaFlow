@@ -45,6 +45,7 @@ async function resetDatabase() {
 
   await User.create({
     name: 'Super Admin',
+    username: 'superadmin',
     email: 'admin@farmaflow.com',
     password: superAdminPassword,
     role: 'SUPER_ADMIN',
@@ -54,6 +55,7 @@ async function resetDatabase() {
   })
 
   console.log('✅ Super Admin creado:')
+  console.log('   Username: superadmin')
   console.log('   Email: admin@farmaflow.com')
   console.log('   Password: SuperAdmin2024!')
 

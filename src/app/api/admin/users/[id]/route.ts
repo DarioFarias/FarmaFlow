@@ -53,12 +53,17 @@ export async function PATCH(
       user.username = validated.username
     }
     if (validated.email !== undefined) {
-      // Verificar que el nuevo email no esté en uso por otro usuario
-      const existingEmail = await User.findOne({ email: validated.email, _id: { $ne: id } })
-      if (existingEmail) {
-        return NextResponse.json({ error: 'El email ya está en uso por otro usuario' }, { status: 400 })
+      // Tratar string vacío como null (el email es opcional)
+      const emailValue = validated.email.trim() === '' ? null : validated.email.toLowerCase().trim()
+      
+      // Verificar que el nuevo email no esté en uso por otro usuario (solo si hay un email válido)
+      if (emailValue) {
+        const existingEmail = await User.findOne({ email: emailValue, _id: { $ne: id } })
+        if (existingEmail) {
+          return NextResponse.json({ error: 'El email ya está en uso por otro usuario' }, { status: 400 })
+        }
       }
-      user.email = validated.email
+      user.email = emailValue || undefined
     }
     if (validated.role !== undefined) user.role = validated.role as UserRole
     // NOTE: pharmacyName y pharmacyCode ya no existen en IUser (las farmacias están en colección Pharmacy)

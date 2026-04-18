@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
     // Crear usuario
     const user = await User.create({
       name: validated.name,
-      username: validated.username.trim(),
+      username: validated.username.trim().toLowerCase(), // Normalizar a lowercase
       email: validated.email ? validated.email.toLowerCase().trim() : undefined,
       password: hashedPassword,
       role: validated.role as UserRole,

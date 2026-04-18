@@ -113,7 +113,8 @@ export default function EditUserModal({
     const updateData: Partial<UserFormData> = {}
     if (formData.name !== user.name) updateData.name = formData.name
     if (formData.username !== user.username) updateData.username = formData.username
-    if (formData.email !== user.email) updateData.email = formData.email
+    // Enviar email como string vacío si se limpió (el backend lo convierte a null)
+    if (formData.email !== (user.email || '')) updateData.email = formData.email
     if (formData.role !== user.role) updateData.role = formData.role
     if (formData.phone !== user.phone) updateData.phone = formData.phone
     

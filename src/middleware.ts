@@ -13,6 +13,11 @@ export default withAuth(
     const { pathname } = req.nextUrl
     const token = req.nextauth.token
 
+    // Excluir rutas de NextAuth y login del middleware
+    if (pathname.startsWith('/api/auth/') || pathname === '/login') {
+      return NextResponse.next()
+    }
+
     const role = token?.role as UserRole | undefined
 
     // Rutas exclusivas del ADMIN (Supervisor) y SUPER_ADMIN
@@ -48,7 +53,7 @@ export default withAuth(
   }
 )
 
-// Matcher: protege todas las rutas bajo /dashboard y /api (excepto auth)
+// Matcher: protege dashboard y APIs, excluye login y auth
 export const config = {
   matcher: [
     '/dashboard/:path*',

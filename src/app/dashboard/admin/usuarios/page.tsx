@@ -43,7 +43,12 @@ export default function UsuariosAdminPage() {
     try {
       const res = await fetch('/api/admin/pharmacies')
       const data = await res.json()
-      if (Array.isArray(data)) {
+      
+      // La API devuelve formato paginado: { data: [...], total, page, limit }
+      if (data && Array.isArray(data.data)) {
+        setPharmacies(data.data as unknown as IPharmacy[])
+      } else if (Array.isArray(data)) {
+        // Compatibilidad con APIs que devuelven array directo
         setPharmacies(data as unknown as IPharmacy[])
       }
     } catch (error) {
@@ -57,12 +62,17 @@ export default function UsuariosAdminPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al obtener usuarios')
       
-      if (Array.isArray(data)) {
+      // La API devuelve formato paginado: { data: [...], total, page, pageSize }
+      if (data && Array.isArray(data.data)) {
+        setUsers(data.data)
+      } else if (Array.isArray(data)) {
+        // Compatibilidad con API legacy que devuelve array directo
         setUsers(data)
       } else {
         throw new Error('Formato de datos incorrecto')
       }
     } catch (error: any) {
+      console.error('Error fetching users:', error)
       toast.error(error.message || 'Error al cargar usuarios')
       setUsers([])
     } finally {

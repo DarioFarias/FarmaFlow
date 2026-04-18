@@ -25,6 +25,7 @@ export function Header({ onMenuClick, userName, profileImage }: HeaderProps) {
         <div className="hidden sm:flex items-center bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5 focus-within:ring-2 ring-brand-500 ring-offset-1 transition-all">
           <Search size={16} className="text-gray-400 mr-2" />
           <input 
+            id="header-search"
             type="text" 
             placeholder="Buscar..." 
             className="bg-transparent border-none focus:outline-none text-sm w-48 text-gray-700"

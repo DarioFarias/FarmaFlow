@@ -87,9 +87,10 @@ const UserSchema = new Schema<IUserDocument>(
 )
 
 // ---- ÍNDICES ----
-// Nota: email y pharmacyCode ya tienen índices por unique: true
-// Username index - case-sensitive (collation con strength: 2)
-UserSchema.index({ username: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } })
+// Username index - case-sensitive para evitar comportamiento ambiguo
+// NOTA: Antes tenía collation strength:2 que hacía la búsqueda case-insensitive
+// Eso causaba bugs donde "SuperAdmin" y "superadmin" devolvían el mismo usuario
+UserSchema.index({ username: 1 }, { unique: true })
 UserSchema.index({ role: 1 })
 UserSchema.index({ isActive: 1 })
 
