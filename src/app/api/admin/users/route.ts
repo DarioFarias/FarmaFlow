@@ -71,11 +71,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    console.log('POST /api/admin/users - body:', JSON.stringify(body))
     
     // Validar datos con Zod
     const validated = adminCreateUserSchema.parse(body)
-    console.log('POST /api/admin/users - validated:', JSON.stringify(validated))
     
     await connectDB()
     

@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 
     // Si es SUPERVISOR, solo puede ver las farmacias asignadas
     if (isSupervisor(userRole)) {
-      const assignedPharmacies = (session.user as any).assignedPharmacies || []
+      const assignedPharmacies = session.user.assignedPharmacies || []
       if (assignedPharmacies.length > 0) {
         // Buscar pharmacies por assignedPharmacies (pharmacyCode en la colección Pharmacy)
         const assignedPharmaciesDocs = await Pharmacy.find({

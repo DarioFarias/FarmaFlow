@@ -31,7 +31,7 @@ export default async function GastosPage() {
     
     if (!isUserAdmin) {
       // No-admin: filtrar por assignedPharmacies
-      const assignedPharmacies = (session.user as any).assignedPharmacies || []
+      const assignedPharmacies = session.user.assignedPharmacies || []
       if (assignedPharmacies.length > 0) {
         // Obtener los IDs de las farmacias asignadas
         const pharmacies = await Pharmacy.find({ pharmacyCode: { $in: assignedPharmacies } }).select('_id')

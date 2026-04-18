@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     // Obtener nombre de farmacia desde la colección Pharmacy usando assignedPharmacies
     let pharmacyName = 'Farmacia'
-    const assignedPharmacies = (session.user as any).assignedPharmacies || []
+    const assignedPharmacies = session.user.assignedPharmacies || []
     if (assignedPharmacies.length > 0) {
       const { default: Pharmacy } = await import('@/models/Pharmacy')
       const pharmacyDoc = await Pharmacy.findOne({
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
     // Ahora los usuarios normales ven sus propios gastos
     // Los SUPERVISOR ven los gastos de farmacias asignadas
     if (userRole === UserRole.SUPERVISOR) {
-      const assignedPharmacies = (session.user as any).assignedPharmacies || []
+      const assignedPharmacies = session.user.assignedPharmacies || []
       if (assignedPharmacies.length > 0) {
         // Filtar por pharmacyCode en la colección Pharmacy (no en User)
         const { default: Pharmacy } = await import('@/models/Pharmacy')

@@ -86,8 +86,9 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     )
 
-  } catch (error: any) {
-    console.error('API_USERS_POST_ERROR:', error)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error desconocido'
+    console.error('API_USERS_POST_ERROR:', message)
     return NextResponse.json(
       { error: 'Error interno del servidor al crear el usuario.' },
       { status: 500 }

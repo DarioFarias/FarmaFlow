@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
 
     await connectDB()
 
-    // El nombre de la farmacia viene de la sesión (retrocompatibilidad) o del nombre del usuario
-    const pharmacyName = (session.user as any).pharmacyName || session.user.name
+    // El nombre de la farmacia viene del nombre del usuario en la sesión
+    const pharmacyName = session.user.name
 
     const newRequest = await SupplyRequest.create({
       ...validation.data,
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
     }
     // Si es SUPERVISOR, solo ve pedidos de farmacias asignadas
     else if (userRole === UserRole.SUPERVISOR) {
-      const assignedPharmacies = (session.user as any).assignedPharmacies || []
+      const assignedPharmacies = session.user.assignedPharmacies || []
       if (assignedPharmacies.length > 0) {
         // Filtar por pharmacyCode en la colección Pharmacy (no en User)
         const { default: Pharmacy } = await import('@/models/Pharmacy')

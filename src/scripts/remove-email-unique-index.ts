@@ -78,15 +78,17 @@ async function main() {
     console.log('\n✅ Desconectado de MongoDB')
     console.log('\n✨ Proceso completado exitosamente!')
 
-  } catch (error: any) {
-    if (error.code === 85 || error.code === 86) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error desconocido'
+    const errorCode = error instanceof Error ? (error as any).code : undefined
+    if (errorCode === 85 || errorCode === 86) {
       // Índice no existe - no es error crítico
       console.log(`\n⚠️  El índice '${INDEX_NAME}' no existe o ya fue eliminado`)
       await mongoose.disconnect()
       console.log('✅ Desconectado de MongoDB')
       process.exit(0)
     }
-    console.error('\n❌ Error:', error.message || error)
+    console.error('\n❌ Error:', message)
     process.exit(1)
   }
 }
