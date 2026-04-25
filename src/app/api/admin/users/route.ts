@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
-import { isSuperAdmin, isAdmin, canCreateRole, canManageUsers, validatePharmacyAssignment } from '@/lib/roles'
+import { isSuperAdmin, isAdmin, canCreateRole, canManageUsers, validatePharmacyAssignment, getCreatableRoles } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { adminCreateUserSchema, paginationParams } from '@/lib/validations'
 import bcrypt from 'bcryptjs'
@@ -30,13 +30,19 @@ export async function GET(req: NextRequest) {
     })
     const { page, pageSize } = pagination.success ? pagination.data : { page: 1, pageSize: 20 }
 
-    // Sanitizar role filter
+    // Sanitizar role filter - solo permite roles que el usuario actual puede ver
+    const userRole = session.user.role as UserRole
+    const allowedRoles = getCreatableRoles(userRole)
     const roleFilter = searchParams.get('role')
-    const sanitizedRole = roleFilter && ['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN', 'ENCARGADO', 'VENDEDOR'].includes(roleFilter) ? roleFilter : undefined
+    const sanitizedRole = roleFilter && allowedRoles.includes(roleFilter as UserRole) ? roleFilter : undefined
 
+    // Filtrar por rol solo si es un rol que el usuario actual puede ver
     let query = {}
     if (sanitizedRole) {
       query = { role: sanitizedRole }
+    } else {
+      // Si no hay filtro específico, solo mostrar roles de nivel inferior
+      query = { role: { $in: allowedRoles } }
     }
 
     // Ejecutar query con paginación

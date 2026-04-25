@@ -172,6 +172,7 @@ export default function UsuariosAdminPage() {
             <UserTable
               users={users}
               currentUserId={session?.user?.id}
+              currentUserRole={session?.user?.role}
               actionId={actionId}
               onToggleActive={handleToggleActive}
               onEdit={openEditModal}

@@ -6,10 +6,12 @@ import {
   Pencil, Key, Trash2, Loader2 
 } from 'lucide-react'
 import clsx from 'clsx'
+import { canEditUser } from '@/lib/roles'
 
 interface UserTableProps {
   users: IUser[]
   currentUserId?: string
+  currentUserRole?: UserRole
   actionId: string | null
   onToggleActive: (userId: string, currentStatus: boolean) => void
   onEdit: (user: IUser) => void
@@ -20,6 +22,7 @@ interface UserTableProps {
 export default function UserTable({
   users,
   currentUserId,
+  currentUserRole,
   actionId,
   onToggleActive,
   onEdit,
@@ -27,8 +30,14 @@ export default function UserTable({
   onDelete,
 }: UserTableProps) {
   const canDeleteUser = (user: IUser, allUsers: IUser[]) => {
-    if (user.role === 'SUPER_ADMIN' && user._id === currentUserId) return false
+    // No puede eliminarse a sí mismo
+    if (user._id === currentUserId) return false
+    // No puede eliminar SUPER_ADMIN a menos que sea SUPER_ADMIN superior
+    if (user.role === 'SUPER_ADMIN' && currentUserRole !== 'SUPER_ADMIN') return false
+    // No puede eliminar al último SUPER_ADMIN activo
     if (user.role === 'SUPER_ADMIN' && allUsers.filter(u => u.role === 'SUPER_ADMIN' && u.isActive).length <= 1) return false
+    // Verificar jerarquía: solo puede eliminar usuarios de nivel inferior
+    if (!canEditUser(currentUserRole, user.role as UserRole)) return false
     return true
   }
 
@@ -76,26 +85,29 @@ export default function UserTable({
             <div className="flex justify-end gap-1">
               <button 
                 onClick={() => onToggleActive(u._id, u.isActive)}
-                disabled={actionId === u._id}
+                disabled={actionId === u._id || !canEditUser(currentUserRole, u.role as UserRole)}
                 className={clsx(
                   "p-1.5 rounded-lg transition-colors",
-                  u.isActive ? "text-red-500 hover:bg-red-50" : "text-emerald-500 hover:bg-emerald-50"
+                  u.isActive ? "text-red-500 hover:bg-red-50" : "text-emerald-500 hover:bg-emerald-50",
+                  (!canEditUser(currentUserRole, u.role as UserRole) || actionId === u._id) && "disabled:hover:bg-transparent disabled:text-gray-200 disabled:cursor-not-allowed"
                 )}
-                title={u.isActive ? "Desactivar" : "Activar"}
+                title={!canEditUser(currentUserRole, u.role as UserRole) ? "No tienes permisos para modificar este usuario" : u.isActive ? "Desactivar" : "Activar"}
               >
                 {u.isActive ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
               </button>
               <button 
                 onClick={() => onEdit(u)}
-                className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                title="Editar usuario"
+                disabled={!canEditUser(currentUserRole, u.role as UserRole)}
+                className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors disabled:hover:bg-transparent disabled:text-gray-200 disabled:cursor-not-allowed"
+                title={!canEditUser(currentUserRole, u.role as UserRole) ? "No tienes permisos para editar este usuario" : "Editar usuario"}
               >
                 <Pencil size={18} />
               </button>
               <button 
                 onClick={() => onPassword(u)}
-                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                title="Cambiar contraseña"
+                disabled={!canEditUser(currentUserRole, u.role as UserRole)}
+                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:hover:bg-transparent disabled:text-gray-200 disabled:cursor-not-allowed"
+                title={!canEditUser(currentUserRole, u.role as UserRole) ? "No tienes permisos para cambiar la contraseña de este usuario" : "Cambiar contraseña"}
               >
                 <Key size={18} />
               </button>
@@ -105,9 +117,11 @@ export default function UserTable({
                 className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:hover:bg-transparent disabled:text-gray-200 disabled:cursor-not-allowed"
                 title={
                   !canDeleteUser(u, users)
-                    ? u.role === 'SUPER_ADMIN' && u._id === currentUserId
+                    ? u._id === currentUserId
                       ? 'No puedes eliminar tu propia cuenta'
-                      : 'No puedes eliminar al último Super Admin'
+                      : u.role === 'SUPER_ADMIN' && users.filter(u => u.role === 'SUPER_ADMIN' && u.isActive).length <= 1
+                        ? 'No puedes eliminar al último Super Admin'
+                        : 'No tienes permisos para eliminar este usuario'
                     : 'Eliminar usuario'
                 }
               >
