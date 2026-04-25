@@ -14,6 +14,9 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
+  // El Sidebar mostrará "Administración" para ADMIN/SUPER_ADMIN/SUPERVISOR
+  // Para ENCARGADO/VENDEDOR, mostrará "Mi Farmacia" (el nombre real se ve en otras partes del UI)
+  
   return (
     <DashboardShell user={session.user}>
       {children}

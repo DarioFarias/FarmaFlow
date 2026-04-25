@@ -60,7 +60,11 @@ export async function GET(req: NextRequest) {
     // Ejecutar query con paginación
     const skip = (page - 1) * pageSize
     const [pharmacies, total] = await Promise.all([
-      Pharmacy.find(query).sort({ pharmacyName: 1 }).skip(skip).limit(pageSize),
+      Pharmacy.find(query)
+        .sort({ pharmacyName: 1 })
+        .skip(skip)
+        .limit(pageSize)
+        .select('pharmacyName address phone email isActive createdAt'),
       Pharmacy.countDocuments(query),
     ])
 

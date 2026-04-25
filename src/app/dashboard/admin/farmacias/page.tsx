@@ -1,34 +1,62 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, MapPin, Phone, Mail, Edit } from 'lucide-react'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import Pharmacy from '@/models/Pharmacy'
-import { UserRole } from '@/types'
+import { useSession } from 'next-auth/react'
+import { Plus, MapPin, Phone, Mail, Edit, Loader2 } from 'lucide-react'
+import { IPharmacyResponse } from '@/types/api-responses'
 
-export const dynamic = 'force-dynamic'
-
-export default async function FarmaciasPage() {
-  await connectDB()
+export default function FarmaciasPage() {
+  const { data: session } = useSession()
+  const [farmacias, setFarmacias] = useState<IPharmacyResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   
-  const session = await getServerSession(authOptions) as any
-  const userRole = session?.user?.role as UserRole | undefined
+  const userRole = session?.user?.role
   const assignedPharmacies = session?.user?.assignedPharmacies as string[] | undefined
-  
-  let farmacias = await Pharmacy.find({}).sort({ pharmacyName: 1 })
-
-  // Si es SUPERVISOR, filtrar solo las farmacias asignadas
   const isSupervisor = userRole === 'SUPERVISOR'
-  if (isSupervisor && assignedPharmacies && assignedPharmacies.length > 0) {
-    // Convertir ObjectId a string para comparar
-    const assignedIds = assignedPharmacies.map(id => id.toString())
-    farmacias = farmacias.filter(f => 
-      assignedIds.includes(f._id.toString()) || 
-      assignedIds.includes(String(f._id))
-    ) as any
+
+  useEffect(() => {
+    fetchFarmacias()
+  }, [])
+
+  const fetchFarmacias = async () => {
+    try {
+      const res = await fetch('/api/admin/pharmacies')
+      const data = await res.json()
+      
+      let farms: IPharmacyResponse[] = []
+      if (data && Array.isArray(data.data)) {
+        farms = data.data as IPharmacyResponse[]
+      } else if (Array.isArray(data)) {
+        farms = data as IPharmacyResponse[]
+      }
+
+      // Si es SUPERVISOR, filtrar solo las farmacias asignadas
+      if (isSupervisor && assignedPharmacies && assignedPharmacies.length > 0) {
+        const assignedIds = assignedPharmacies.map(id => id.toString())
+        farms = farms.filter(f => 
+          assignedIds.includes(f._id.toString()) || 
+          assignedIds.includes(String(f._id))
+        )
+      }
+
+      setFarmacias(farms)
+    } catch (error) {
+      console.error('Error fetching farmacias:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const showNoAccessMessage = isSupervisor && (!assignedPharmacies || assignedPharmacies.length === 0)
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="animate-spin text-brand-500" size={32} />
+      </div>
+    )
+  }
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -56,7 +84,7 @@ export default async function FarmaciasPage() {
           </div>
         ) : (
           farmacias.map((f) => (
-            <div key={f.id} className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
+            <div key={f._id} className="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-3">
                 <div>
                   <span className="text-xs font-mono text-gray-500 bg-gray-50 px-2 py-0.5 rounded">

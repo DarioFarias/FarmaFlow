@@ -111,7 +111,8 @@ export async function GET(req: NextRequest) {
       Expense.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(pageSize),
+        .limit(pageSize)
+        .select('expenseNumber pharmacy pharmacyName amount currency category description vendor receiptDate status createdAt'),
       Expense.countDocuments(query),
     ])
 

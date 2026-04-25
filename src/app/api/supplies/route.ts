@@ -108,7 +108,8 @@ export async function GET(req: NextRequest) {
       SupplyRequest.find(query)
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(pageSize),
+        .limit(pageSize)
+        .select('requestNumber pharmacy pharmacyName items status priority createdAt'),
       SupplyRequest.countDocuments(query),
     ])
 

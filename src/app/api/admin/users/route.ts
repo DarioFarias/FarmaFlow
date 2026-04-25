@@ -56,7 +56,11 @@ export async function GET(req: NextRequest) {
     // Ejecutar query con paginación
     const skip = (page - 1) * pageSize
     const [users, total] = await Promise.all([
-      User.find(query).sort({ createdAt: -1 }).skip(skip).limit(pageSize),
+      User.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .select('name email role isActive phone assignedPharmacies profileImage createdAt'),
       User.countDocuments(query),
     ])
 

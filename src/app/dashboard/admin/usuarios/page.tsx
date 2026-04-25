@@ -35,8 +35,8 @@ export default function UsuariosAdminPage() {
   const creatableRoles = getCreatableRoles(session?.user?.role as UserRole)
 
   useEffect(() => {
-    fetchUsers()
-    fetchPharmacies()
+    // Fetch paralelo para mejor rendimiento
+    Promise.all([fetchUsers(), fetchPharmacies()])
   }, [])
 
   const fetchPharmacies = async () => {
@@ -171,6 +171,7 @@ export default function UsuariosAdminPage() {
           <tbody>
             <UserTable
               users={users}
+              pharmacies={pharmacies}
               currentUserId={session?.user?.id}
               currentUserRole={session?.user?.role}
               currentUserAssignedPharmacies={session?.user?.assignedPharmacies}

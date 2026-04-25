@@ -19,10 +19,10 @@ export function Sidebar({ role, assignedPharmacies, isOpen, setIsOpen, profileIm
   const isAdmin = role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN
   const isSupervisor = role === UserRole.SUPERVISOR
   
-  // Mostrar el código de la primera farmacia asignada o "Mi Farmacia"
-  const pharmacyLabel = assignedPharmacies && assignedPharmacies.length > 0 
-    ? assignedPharmacies[0] 
-    : 'Mi Farmacia'
+  // Label para el header de navegación: 
+  // - ADMIN/SUPER_ADMIN/SUPERVISOR: "Administración"
+  // - ENCARGADO/VENDEDOR: "Mi Farmacia"
+  const navLabel = isAdmin || isSupervisor ? 'Administración' : 'Mi Farmacia'
 
   const navItems = isAdmin || isSupervisor
     ? [
@@ -78,7 +78,7 @@ export function Sidebar({ role, assignedPharmacies, isOpen, setIsOpen, profileIm
           <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
             <div className="mb-4 px-2">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                {isAdmin ? 'Administración' : pharmacyLabel}
+                {navLabel}
               </p>
             </div>
             

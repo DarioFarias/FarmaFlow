@@ -1,6 +1,6 @@
 'use client'
 
-import { IUser, UserRole } from '@/types'
+import { IUser, IPharmacy, UserRole } from '@/types'
 import { 
   ToggleLeft, ToggleRight, 
   Pencil, Key, Trash2, Loader2 
@@ -10,6 +10,7 @@ import { canEditUser, isSupervisor } from '@/lib/roles'
 
 interface UserTableProps {
   users: IUser[]
+  pharmacies?: IPharmacy[]
   currentUserId?: string
   currentUserRole?: UserRole
   currentUserAssignedPharmacies?: string[]
@@ -22,6 +23,7 @@ interface UserTableProps {
 
 export default function UserTable({
   users,
+  pharmacies = [],
   currentUserId,
   currentUserRole,
   currentUserAssignedPharmacies,
@@ -31,6 +33,11 @@ export default function UserTable({
   onPassword,
   onDelete,
 }: UserTableProps) {
+  // Obtener nombre de farmacia por código
+  const getPharmacyName = (pharmacyCode: string): string => {
+    const pharmacy = pharmacies.find(p => p._id === pharmacyCode || p.pharmacyName === pharmacyCode)
+    return pharmacy?.pharmacyName || pharmacyCode
+  }
   // Verificar si el usuario actual puede gestionar la pharmacy del usuario objetivo
   // Para SUPERVISOR: solo puede gestionar usuarios que tengan al menos una pharmacy en común
   const canManageUserPharmacy = (targetUser: IUser): boolean => {
@@ -85,7 +92,9 @@ export default function UserTable({
           </td>
           <td className="py-4 px-4 text-sm text-gray-600">
             {u.assignedPharmacies?.length ? (
-              <span className="text-xs">{u.assignedPharmacies.join(', ')}</span>
+              <span className="text-xs">
+                {u.assignedPharmacies.map(code => getPharmacyName(code)).join(', ')}
+              </span>
             ) : (
               '---'
             )}

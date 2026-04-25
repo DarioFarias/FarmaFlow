@@ -1,17 +1,14 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Receipt, Plus, Eye } from 'lucide-react'
-import connectDB from '@/lib/mongodb'
-import Expense from '@/models/Expense'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { UserRole, ExpenseStatus, IPharmacy } from '@/types'
-import { isAdmin } from '@/lib/roles'
+import { useSession } from 'next-auth/react'
+import { Receipt, Plus, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { UserRole, ExpenseStatus } from '@/types'
+import { IExpenseResponse } from '@/types/api-responses'
 import { AuditActions } from '@/components/audit/AuditActions'
-import Pharmacy from '@/models/Pharmacy'
-
-export const dynamic = 'force-dynamic'
 
 const STATUS_CONFIG: Record<string, { label: string, classes: string }> = {
   [ExpenseStatus.PENDING]: { label: 'Pendiente', classes: 'bg-amber-50 text-amber-700 ring-amber-600/20' },
@@ -20,41 +17,61 @@ const STATUS_CONFIG: Record<string, { label: string, classes: string }> = {
   [ExpenseStatus.DISPUTED]: { label: 'Disputado', classes: 'bg-red-50 text-red-700 ring-red-600/20' },
 }
 
-export default async function GastosPage() {
-  const session = await getServerSession(authOptions)
-  await connectDB()
+// Helper para verificar si es admin
+function isAdminUser(role?: string): boolean {
+  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN || role === UserRole.SUPERVISOR
+}
 
-  let query = {}
-  if (session?.user) {
-    const userRole = session.user.role as UserRole
-    const isUserAdmin = isAdmin(userRole)
-    
-    if (!isUserAdmin) {
-      // No-admin: filtrar por assignedPharmacies
-      const assignedPharmacies = session.user.assignedPharmacies || []
-      if (assignedPharmacies.length > 0) {
-        // Obtener los IDs de las farmacias asignadas
-        const pharmacies = await Pharmacy.find({ pharmacyCode: { $in: assignedPharmacies } }).select('_id')
-        const pharmacyIds = pharmacies.map(p => p._id)
-        query = { pharmacy: { $in: pharmacyIds } }
-      } else {
-        query = { pharmacy: null } // No tiene farmacias asignadas
+export default function GastosPage() {
+  const { data: session } = useSession()
+  const [gastos, setGastos] = useState<IExpenseResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const userRole = session?.user?.role as UserRole | undefined
+  const isUserAdmin = isAdminUser(userRole)
+
+  useEffect(() => {
+    fetchGastos()
+  }, [])
+
+  const fetchGastos = async () => {
+    try {
+      const res = await fetch('/api/expenses')
+      const data = await res.json()
+      
+      let items: IExpenseResponse[] = []
+      if (data && Array.isArray(data.data)) {
+        items = data.data as IExpenseResponse[]
+      } else if (Array.isArray(data)) {
+        items = data as IExpenseResponse[]
       }
+
+      setGastos(items)
+    } catch (error) {
+      console.error('Error fetching expenses:', error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const gastos = await Expense.find(query).sort({ receiptDate: -1 })
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="animate-spin text-brand-500" size={32} />
+      </div>
+    )
+  }
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="mb-8 flex justify-between items-end">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Auditoría de Gastos</h1>
-          <p className="text-gray-500 mt-1 text-sm">Gestiona la rendición de cuentas y comprobantes.</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Gastos</h1>
+          <p className="text-gray-500 mt-1 text-sm">Registra y gestiona los gastos operativos.</p>
         </div>
-        <Link href="/dashboard/gastos/nuevo" className="btn-primary flex items-center gap-2 font-semibold">
+        <Link href="/dashboard/gastos/nuevo" className="btn-primary flex items-center gap-2">
           <Plus size={18} />
-          Rendir Gasto
+          Nuevo Gasto
         </Link>
       </div>
 
@@ -62,70 +79,63 @@ export default async function GastosPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50/50 border-b border-gray-100">
-              <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Fecha Ticket</th>
-              {isAdmin(session?.user.role as UserRole) && (
+              <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Nº Gasto</th>
+              <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Fecha</th>
+              {isUserAdmin && (
                 <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Sucursal</th>
               )}
-              <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Categoría</th>
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Descripción</th>
-              <th className="py-3 px-4 font-semibold text-gray-600 text-sm text-right">Monto</th>
-              <th className="py-3 px-4 font-semibold text-gray-600 text-sm text-center">Estado</th>
-              <th className="py-3 px-4 font-semibold text-gray-600 text-sm"></th>
+              <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Monto</th>
+              <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Categoría</th>
+              <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Estado</th>
+              {isUserAdmin && (
+                <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Auditoría</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {gastos.length === 0 ? (
               <tr>
-                <td colSpan={isAdmin(session?.user.role as UserRole) ? 7 : 6} className="py-12 text-center text-gray-400 italic text-sm">
-                  <Receipt size={32} className="mx-auto mb-3 text-gray-200" />
-                  No hay gastos registrados por el momento.
+                <td colSpan={isUserAdmin ? 8 : 6} className="py-12 text-center">
+                  <Receipt size={32} className="mx-auto mb-3 text-gray-300" />
+                  <p className="text-gray-400 text-sm italic">No hay gastos registrados todavía.</p>
                 </td>
               </tr>
             ) : (
               gastos.map((g) => {
                 const statusInfo = STATUS_CONFIG[g.status] || { label: g.status, classes: 'bg-gray-50' }
                 return (
-                  <tr key={g.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/30 transition-colors">
-                    <td className="py-4 px-4 text-xs font-medium text-gray-500">
-                      {format(new Date(g.receiptDate), 'dd/MM/yyyy')}
+                  <tr key={g._id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/30 transition-colors">
+                    <td className="py-3 px-4 text-sm font-bold text-gray-900">
+                      {g.expenseNumber}
                     </td>
-                    {isAdmin(session?.user.role as UserRole) && (
-                      <td className="py-4 px-4 text-sm font-semibold text-gray-900">
+                    <td className="py-3 px-4 text-xs text-gray-500">
+                      {format(new Date(g.receiptDate), 'dd MMM, yyyy', { locale: es })}
+                    </td>
+                    {isUserAdmin && (
+                      <td className="py-3 px-4 text-sm text-gray-600">
                         {g.pharmacyName}
                       </td>
                     )}
-                    <td className="py-4 px-4">
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium uppercase tracking-tight">
-                        {g.category}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-sm text-gray-600 max-w-xs truncate">
+                    <td className="py-3 px-4 text-sm text-gray-900 max-w-[200px] truncate">
                       {g.description}
                     </td>
-                    <td className="py-4 px-4 text-sm font-bold text-gray-900 text-right">
-                      {new Intl.NumberFormat('es-AR', { style: 'currency', currency: g.currency }).format(g.amount)}
+                    <td className="py-3 px-4 text-sm font-medium text-gray-900">
+                      {g.currency} {g.amount.toLocaleString('es-MX')}
                     </td>
-                    <td className="py-4 px-4 text-center">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold ring-1 ring-inset ${statusInfo.classes}`}>
-                        {statusInfo.label.toUpperCase()}
+                    <td className="py-3 px-4 text-sm text-gray-600">
+                      {g.category}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold ring-1 ring-inset ${statusInfo.classes}`}>
+                        {statusInfo.label}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-right flex items-center justify-end gap-2">
-                      {g.invoiceImageUrl && (
-                        <a 
-                          href={g.invoiceImageUrl} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="p-1.5 text-brand-600 hover:bg-brand-50 rounded-lg inline-block transition-colors"
-                          title="Ver Comprobante"
-                        >
-                          <Eye size={16} />
-                        </a>
-                      )}
-                      {isAdmin(session?.user.role as UserRole) && (
-                        <AuditActions id={g.id.toString()} type="expense" currentStatus={g.status} />
-                      )}
-                    </td>
+                    {isUserAdmin && (
+                      <td className="py-3 px-4">
+                        <AuditActions id={g._id} type="expense" currentStatus={g.status} />
+                      </td>
+                    )}
                   </tr>
                 )
               })

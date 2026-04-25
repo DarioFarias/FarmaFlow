@@ -107,7 +107,9 @@ export async function GET(req: NextRequest) {
 
     await connectDB()
     // NOTE: Ya no filtramos por PHARMACY - listamos todos los usuarios
-    const users = await User.find().sort({ createdAt: -1 })
+    const users = await User.find()
+      .sort({ createdAt: -1 })
+      .select('name email role isActive phone assignedPharmacies createdAt')
     
     return NextResponse.json(users)
   } catch (error) {

@@ -93,6 +93,8 @@ const UserSchema = new Schema<IUserDocument>(
 UserSchema.index({ username: 1 }, { unique: true })
 UserSchema.index({ role: 1 })
 UserSchema.index({ isActive: 1 })
+// Índice para filtrar usuarios por pharmacy asignada (SUPERVISOR queries)
+UserSchema.index({ assignedPharmacies: 1 })
 
 // ---- MODELO ----
 // Patrón para evitar re-compilación del modelo en Next.js (hot reload)

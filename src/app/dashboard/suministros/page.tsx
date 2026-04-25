@@ -1,17 +1,14 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Package, Plus } from 'lucide-react'
-import connectDB from '@/lib/mongodb'
-import SupplyRequest from '@/models/SupplyRequest'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { UserRole, SupplyRequestStatus, IPharmacy } from '@/types'
-import { isAdmin } from '@/lib/roles'
+import { useSession } from 'next-auth/react'
+import { Package, Plus, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { UserRole, SupplyRequestStatus } from '@/types'
+import { ISupplyRequestResponse } from '@/types/api-responses'
 import { AuditActions } from '@/components/audit/AuditActions'
-import Pharmacy from '@/models/Pharmacy'
-
-export const dynamic = 'force-dynamic'
 
 const STATUS_CONFIG: Record<string, { label: string, classes: string }> = {
   [SupplyRequestStatus.REQUESTED]: { label: 'Pedido', classes: 'bg-blue-50 text-blue-700 ring-blue-600/20' },
@@ -21,30 +18,50 @@ const STATUS_CONFIG: Record<string, { label: string, classes: string }> = {
   [SupplyRequestStatus.REJECTED]: { label: 'Rechazado', classes: 'bg-red-50 text-red-700 ring-red-600/20' },
 }
 
-export default async function SuministrosPage() {
-  const session = await getServerSession(authOptions)
-  await connectDB()
+// Helper para verificar si es admin
+function isAdminUser(role?: string): boolean {
+  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN || role === UserRole.SUPERVISOR
+}
 
-  let query = {}
-  if (session?.user) {
-    const userRole = session.user.role as UserRole
-    const isUserAdmin = isAdmin(userRole)
-    
-    if (!isUserAdmin) {
-      // No-admin: filtrar por assignedPharmacies
-      const assignedPharmacies = session.user.assignedPharmacies || []
-      if (assignedPharmacies.length > 0) {
-        // Obtener los IDs de las farmacias asignadas
-        const pharmacies = await Pharmacy.find({ pharmacyCode: { $in: assignedPharmacies } }).select('_id')
-        const pharmacyIds = pharmacies.map(p => p._id)
-        query = { pharmacy: { $in: pharmacyIds } }
-      } else {
-        query = { pharmacy: null } // No tiene farmacias asignadas
+export default function SuministrosPage() {
+  const { data: session } = useSession()
+  const [pedidos, setPedidos] = useState<ISupplyRequestResponse[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const userRole = session?.user?.role as UserRole | undefined
+  const isUserAdmin = isAdminUser(userRole)
+
+  useEffect(() => {
+    fetchPedidos()
+  }, [])
+
+  const fetchPedidos = async () => {
+    try {
+      const res = await fetch('/api/supplies')
+      const data = await res.json()
+      
+      let items: ISupplyRequestResponse[] = []
+      if (data && Array.isArray(data.data)) {
+        items = data.data as ISupplyRequestResponse[]
+      } else if (Array.isArray(data)) {
+        items = data as ISupplyRequestResponse[]
       }
+
+      setPedidos(items)
+    } catch (error) {
+      console.error('Error fetching supplies:', error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const pedidos = await SupplyRequest.find(query).sort({ createdAt: -1 })
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="animate-spin text-brand-500" size={32} />
+      </div>
+    )
+  }
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -65,13 +82,13 @@ export default async function SuministrosPage() {
             <tr className="bg-gray-50/50 border-b border-gray-100">
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Nº Pedido</th>
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Fecha</th>
-              {isAdmin(session?.user.role as UserRole) && (
+              {isUserAdmin && (
                 <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Sucursal</th>
               )}
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Ítems</th>
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Prioridad</th>
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Estado</th>
-              {isAdmin(session?.user.role as UserRole) && (
+              {isUserAdmin && (
                 <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Auditoría</th>
               )}
             </tr>
@@ -79,7 +96,7 @@ export default async function SuministrosPage() {
           <tbody>
             {pedidos.length === 0 ? (
               <tr>
-                <td colSpan={isAdmin(session?.user.role as UserRole) ? 7 : 5} className="py-12 text-center">
+                <td colSpan={isUserAdmin ? 7 : 5} className="py-12 text-center">
                   <Package size={32} className="mx-auto mb-3 text-gray-300" />
                   <p className="text-gray-400 text-sm italic">No hay pedidos registrados todavía.</p>
                 </td>
@@ -88,14 +105,14 @@ export default async function SuministrosPage() {
               pedidos.map((p) => {
                 const statusInfo = STATUS_CONFIG[p.status] || { label: p.status, classes: 'bg-gray-50' }
                 return (
-                  <tr key={p.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/30 transition-colors">
+                  <tr key={p._id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/30 transition-colors">
                     <td className="py-3 px-4 text-sm font-bold text-gray-900">
                       {p.requestNumber}
                     </td>
                     <td className="py-3 px-4 text-xs text-gray-500">
                       {format(new Date(p.createdAt), 'dd MMM, HH:mm', { locale: es })}
                     </td>
-                    {isAdmin(session?.user.role as UserRole) && (
+                    {isUserAdmin && (
                       <td className="py-3 px-4 text-sm text-gray-600">
                         {p.pharmacyName}
                       </td>
@@ -106,7 +123,7 @@ export default async function SuministrosPage() {
                           {p.items.length} {p.items.length === 1 ? 'ítem' : 'ítems'}
                         </span>
                         <span className="text-[10px] text-gray-400 truncate max-w-[150px]">
-                          {p.items.map(i => i.name).join(', ')}
+                          {p.items.map((i: any) => i.name).join(', ')}
                         </span>
                       </div>
                     </td>
@@ -124,9 +141,9 @@ export default async function SuministrosPage() {
                         {statusInfo.label}
                       </span>
                     </td>
-                    {isAdmin(session?.user.role as UserRole) && (
+                    {isUserAdmin && (
                       <td className="py-3 px-4">
-                        <AuditActions id={p._id.toString()} type="supply" currentStatus={p.status} />
+                        <AuditActions id={p._id} type="supply" currentStatus={p.status} />
                       </td>
                     )}
                   </tr>
