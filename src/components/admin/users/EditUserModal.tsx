@@ -154,9 +154,10 @@ export default function EditUserModal({
       toast.success('Usuario actualizado correctamente')
       onSuccess()
       onClose()
-    } catch (error: any) {
-      setFormError(error.message || 'Error al actualizar usuario')
-      toast.error(error.message || 'Error al actualizar usuario')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al actualizar usuario'
+      setFormError(message)
+      toast.error(message)
     } finally {
       setIsSubmitting(false)
     }

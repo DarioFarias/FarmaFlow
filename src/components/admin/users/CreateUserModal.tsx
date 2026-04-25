@@ -72,6 +72,22 @@ export default function CreateUserModal({
   // Solo si el creador NO es ENCARGADO, o si es ENCARGADO pero tiene farmacia
   const canSelectVendorRole = !isCreatorEncargado || creatorHasPharmacy
 
+  // Filtrar roles que no se pueden seleccionar (VENDEDOR si el creador es ENCARGADO sin farmacia)
+  const filteredCreatableRoles = creatableRoles.filter(role => {
+    if (role === UserRole.VENDEDOR && !canSelectVendorRole) {
+      return false
+    }
+    return true
+  })
+
+  // Mensaje de error cuando ENCARGADO sin farmacia intenta ver roles
+  const getVendorRoleError = () => {
+    if (isCreatorEncargado && !creatorHasPharmacy) {
+      return ' (Un ENCARGADO sin farmacia asignada no puede crear vendedores)'
+    }
+    return ''
+  }
+
   const getAssignedPharmacyName = () => {
     if (!userAssignedPharmacies || userAssignedPharmacies.length === 0) return 'Sin asignar'
     const pharmacy = pharmacies.find(p => p._id === userAssignedPharmacies[0])
@@ -138,9 +154,10 @@ export default function CreateUserModal({
       resetForm()
       onSuccess()
       onClose()
-    } catch (error: any) {
-      setFormError(error.message || 'Error al crear usuario')
-      toast.error(error.message || 'Error al crear usuario')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error al crear usuario'
+      setFormError(message)
+      toast.error(message)
     } finally {
       setIsSubmitting(false)
     }
@@ -263,14 +280,19 @@ export default function CreateUserModal({
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
             >
-              {creatableRoles.length === 0 ? (
+              {filteredCreatableRoles.length === 0 ? (
                 <option value="">No tienes permisos para crear usuarios</option>
               ) : (
-                creatableRoles.map((role) => (
+                filteredCreatableRoles.map((role) => (
                   <option key={role} value={role}>{role}</option>
                 ))
               )}
             </select>
+            {getVendorRoleError() && (
+              <p className="mt-1 text-xs text-amber-600">
+                ℹ️ {getVendorRoleError()}
+              </p>
+            )}
           </div>
           {/* Campo de asignación de farmacias según el tipo */}
           {assignmentType === 'multiple' && (
