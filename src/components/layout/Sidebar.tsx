@@ -30,7 +30,7 @@ export function Sidebar({ role, assignedPharmacies, isOpen, setIsOpen, profileIm
         { name: 'Suministros', href: '/dashboard/suministros', icon: Package },
         { name: 'Auditoría Gastos', href: '/dashboard/gastos', icon: Receipt },
         { name: 'Farmacias', href: '/dashboard/admin/farmacias', icon: Users },
-        ...(role === UserRole.SUPER_ADMIN ? [{ name: 'Gestión Usuarios', href: '/dashboard/admin/usuarios', icon: UserCog }] : []),
+        ...(isAdmin ? [{ name: 'Gestión Usuarios', href: '/dashboard/admin/usuarios', icon: UserCog }] : []),
       ]
     : isSupervisor
       ? [
