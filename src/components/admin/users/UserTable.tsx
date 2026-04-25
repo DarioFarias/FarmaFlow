@@ -6,12 +6,13 @@ import {
   Pencil, Key, Trash2, Loader2 
 } from 'lucide-react'
 import clsx from 'clsx'
-import { canEditUser } from '@/lib/roles'
+import { canEditUser, isSupervisor } from '@/lib/roles'
 
 interface UserTableProps {
   users: IUser[]
   currentUserId?: string
   currentUserRole?: UserRole
+  currentUserAssignedPharmacies?: string[]
   actionId: string | null
   onToggleActive: (userId: string, currentStatus: boolean) => void
   onEdit: (user: IUser) => void
@@ -23,21 +24,37 @@ export default function UserTable({
   users,
   currentUserId,
   currentUserRole,
+  currentUserAssignedPharmacies,
   actionId,
   onToggleActive,
   onEdit,
   onPassword,
   onDelete,
 }: UserTableProps) {
+  // Verificar si el usuario actual puede gestionar la pharmacy del usuario objetivo
+  // Para SUPERVISOR: solo puede gestionar usuarios que tengan al menos una pharmacy en común
+  const canManageUserPharmacy = (targetUser: IUser): boolean => {
+    // Si no es supervisor, puede gestionar cualquiera de nivel inferior
+    if (!isSupervisor(currentUserRole)) return true
+    
+    // Si es supervisor pero no tiene farmacias asignadas, no puede gestionar nadie
+    if (!currentUserAssignedPharmacies || currentUserAssignedPharmacies.length === 0) return false
+    
+    // Verificar si el usuario objetivo tiene al menos una pharmacy en común
+    const targetPharmacies = targetUser.assignedPharmacies || []
+    const hasCommonPharmacy = targetPharmacies.some(p => currentUserAssignedPharmacies.includes(p))
+    return hasCommonPharmacy
+  }
+
   const canDeleteUser = (user: IUser, allUsers: IUser[]) => {
     // No puede eliminarse a sí mismo
     if (user._id === currentUserId) return false
-    // No puede eliminar SUPER_ADMIN a menos que sea SUPER_ADMIN superior
-    if (user.role === 'SUPER_ADMIN' && currentUserRole !== 'SUPER_ADMIN') return false
-    // No puede eliminar al último SUPER_ADMIN activo
-    if (user.role === 'SUPER_ADMIN' && allUsers.filter(u => u.role === 'SUPER_ADMIN' && u.isActive).length <= 1) return false
+    // No puede eliminar SUPER_ADMIN ni ADMIN
+    if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') return false
     // Verificar jerarquía: solo puede eliminar usuarios de nivel inferior
     if (!canEditUser(currentUserRole, user.role as UserRole)) return false
+    // Verificar pharmacy en común (para SUPERVISOR)
+    if (!canManageUserPharmacy(user)) return false
     return true
   }
 
@@ -91,23 +108,23 @@ export default function UserTable({
                   u.isActive ? "text-red-500 hover:bg-red-50" : "text-emerald-500 hover:bg-emerald-50",
                   (!canEditUser(currentUserRole, u.role as UserRole) || actionId === u._id) && "disabled:hover:bg-transparent disabled:text-gray-200 disabled:cursor-not-allowed"
                 )}
-                title={!canEditUser(currentUserRole, u.role as UserRole) ? "No tienes permisos para modificar este usuario" : u.isActive ? "Desactivar" : "Activar"}
+                title={!canEditUser(currentUserRole, u.role as UserRole) || !canManageUserPharmacy(u) ? "No puedes gestionar usuarios de otras farmacias" : u.isActive ? "Desactivar" : "Activar"}
               >
                 {u.isActive ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
               </button>
               <button 
                 onClick={() => onEdit(u)}
-                disabled={!canEditUser(currentUserRole, u.role as UserRole)}
+                disabled={!canEditUser(currentUserRole, u.role as UserRole) || !canManageUserPharmacy(u)}
                 className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors disabled:hover:bg-transparent disabled:text-gray-200 disabled:cursor-not-allowed"
-                title={!canEditUser(currentUserRole, u.role as UserRole) ? "No tienes permisos para editar este usuario" : "Editar usuario"}
+                title={!canEditUser(currentUserRole, u.role as UserRole) || !canManageUserPharmacy(u) ? "No puedes gestionar usuarios de otras farmacias" : "Editar usuario"}
               >
                 <Pencil size={18} />
               </button>
               <button 
                 onClick={() => onPassword(u)}
-                disabled={!canEditUser(currentUserRole, u.role as UserRole)}
+                disabled={!canEditUser(currentUserRole, u.role as UserRole) || !canManageUserPharmacy(u)}
                 className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:hover:bg-transparent disabled:text-gray-200 disabled:cursor-not-allowed"
-                title={!canEditUser(currentUserRole, u.role as UserRole) ? "No tienes permisos para cambiar la contraseña de este usuario" : "Cambiar contraseña"}
+                title={!canEditUser(currentUserRole, u.role as UserRole) || !canManageUserPharmacy(u) ? "No puedes gestionar usuarios de otras farmacias" : "Cambiar contraseña"}
               >
                 <Key size={18} />
               </button>
@@ -119,9 +136,11 @@ export default function UserTable({
                   !canDeleteUser(u, users)
                     ? u._id === currentUserId
                       ? 'No puedes eliminar tu propia cuenta'
-                      : u.role === 'SUPER_ADMIN' && users.filter(u => u.role === 'SUPER_ADMIN' && u.isActive).length <= 1
-                        ? 'No puedes eliminar al último Super Admin'
-                        : 'No tienes permisos para eliminar este usuario'
+                      : u.role === 'SUPER_ADMIN' || u.role === 'ADMIN'
+                        ? 'No puedes eliminar usuarios de nivel superior'
+                        : !canManageUserPharmacy(u)
+                          ? 'No puedes gestionar usuarios de otras farmacias'
+                          : 'No tienes permisos para eliminar este usuario'
                     : 'Eliminar usuario'
                 }
               >

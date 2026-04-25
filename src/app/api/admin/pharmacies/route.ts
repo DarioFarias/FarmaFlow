@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import Pharmacy from '@/models/Pharmacy'
-import { isSuperAdmin, isAdmin, isSupervisor } from '@/lib/roles'
+import { isSuperAdmin, isAdmin, isSupervisor, hasPharmacyAccess } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { pharmacyCreateSchema, sanitizeSearchInput, paginationParams } from '@/lib/validations'
 import { z } from 'zod'
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     const userRole = session?.user?.role as UserRole
-    if (!session || (!isSuperAdmin(userRole) && !isAdmin(userRole) && !isSupervisor(userRole))) {
+    if (!session || !hasPharmacyAccess(userRole)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
@@ -40,25 +40,21 @@ export async function GET(req: NextRequest) {
       query.isActive = sanitizedActiveFilter
     }
 
-    // Aplicar búsqueda por nombre si existe
-    if (sanitizedSearch) {
-      query.pharmacyName = { $regex: sanitizedSearch, $options: 'i' }
-    }
-
-    // Si es SUPERVISOR, solo puede ver las farmacias asignadas
+    // SUPERVISOR: solo puede ver sus farmacias asignadas
     if (isSupervisor(userRole)) {
       const assignedPharmacies = session.user.assignedPharmacies || []
       if (assignedPharmacies.length > 0) {
-        // Buscar pharmacies por assignedPharmacies (pharmacyCode en la colección Pharmacy)
-        const assignedPharmaciesDocs = await Pharmacy.find({
-          pharmacyCode: { $in: assignedPharmacies },
-        }).select('_id')
-        const pharmacyIds = assignedPharmaciesDocs.map(p => p._id)
-        query._id = { $in: pharmacyIds }
+        // Buscar por _id directamente
+        query._id = { $in: assignedPharmacies }
       } else {
         // Si no tiene farmacias asignadas, no ve nada
         query._id = { $in: [] }
       }
+    }
+
+    // Aplicar búsqueda por nombre si existe
+    if (sanitizedSearch) {
+      query.pharmacyName = { $regex: sanitizedSearch, $options: 'i' }
     }
 
     // Ejecutar query con paginación

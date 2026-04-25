@@ -173,6 +173,7 @@ export default function UsuariosAdminPage() {
               users={users}
               currentUserId={session?.user?.id}
               currentUserRole={session?.user?.role}
+              currentUserAssignedPharmacies={session?.user?.assignedPharmacies}
               actionId={actionId}
               onToggleActive={handleToggleActive}
               onEdit={openEditModal}

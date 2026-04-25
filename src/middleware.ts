@@ -1,7 +1,7 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 import { UserRole } from '@/types'
-import { isAdmin, hasPharmacyAccess } from '@/lib/roles'
+import { isAdmin, isSupervisor, hasPharmacyAccess } from '@/lib/roles'
 
 // =============================================
 // FARMAFLOW - Middleware RBAC
@@ -20,24 +20,24 @@ export default withAuth(
 
     const role = token?.role as UserRole | undefined
 
-    // Rutas exclusivas del ADMIN (Supervisor) y SUPER_ADMIN
-    const adminRoutes = ['/dashboard/admin/usuarios', '/dashboard/admin/configuracion', '/api/admin']
-    const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route))
+    // Rutas exclusivas de ADMIN/SUPER_ADMIN + SUPERVISOR
+    const pharmacyAccessRoutes = ['/dashboard/admin/farmacias', '/dashboard/admin/usuarios', '/api/admin']
+    const isPharmacyAccessRoute = pharmacyAccessRoutes.some((route) => pathname.startsWith(route))
 
-    // Rutas que permiten ADMIN/SUPER_ADMIN + SUPERVISOR
-    const supervisorAdminRoutes = ['/dashboard/admin/farmacias']
-    const isSupervisorAdminRoute = supervisorAdminRoutes.some((route) => pathname.startsWith(route))
+    // Rutas exclusivas de ADMIN/SUPER_ADMIN (sin SUPERVISOR)
+    const adminOnlyRoutes = ['/dashboard/admin/configuracion']
+    const isAdminOnlyRoute = adminOnlyRoutes.some((route) => pathname.startsWith(route))
 
-    // Rutas exclusivas de ADMIN/SUPER_ADMIN
-    if (isAdminRoute && !isAdmin(role)) {
+    // Rutas que permiten ADMIN/SUPER_ADMIN + SUPERVISOR (gestión de farmacias y usuarios)
+    if (isPharmacyAccessRoute && !hasPharmacyAccess(role)) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
       }
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
 
-    // Rutas que permiten ADMIN/SUPER_ADMIN + SUPERVISOR
-    if (isSupervisorAdminRoute && !hasPharmacyAccess(role)) {
+    // Rutas que permiten solo ADMIN/SUPER_ADMIN (configuración)
+    if (isAdminOnlyRoute && !isAdmin(role)) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
       }

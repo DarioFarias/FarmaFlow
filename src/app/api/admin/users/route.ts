@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
-import { isSuperAdmin, isAdmin, canCreateRole, canManageUsers, validatePharmacyAssignment, getCreatableRoles } from '@/lib/roles'
+import { isSuperAdmin, isAdmin, isSupervisor, canCreateRole, canManageUsers, validatePharmacyAssignment, getCreatableRoles, hasPharmacyAccess } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { adminCreateUserSchema, paginationParams } from '@/lib/validations'
 import bcrypt from 'bcryptjs'
@@ -16,8 +16,10 @@ import { z } from 'zod'
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || (!isSuperAdmin(session.user.role as UserRole) && !isAdmin(session.user.role as UserRole))) {
-      return NextResponse.json({ error: 'No autorizado. Se requiere nivel Admin oSuper Admin.' }, { status: 403 })
+    const userRole = session?.user?.role as UserRole
+    // Permitir ADMIN, SUPER_ADMIN y SUPERVISOR (supervisor tiene acceso a pharmacies)
+    if (!session || !hasPharmacyAccess(userRole)) {
+      return NextResponse.json({ error: 'No autorizado. Se requiere acceso de Admin o Supervisor.' }, { status: 403 })
     }
 
     await connectDB()
@@ -31,18 +33,24 @@ export async function GET(req: NextRequest) {
     const { page, pageSize } = pagination.success ? pagination.data : { page: 1, pageSize: 20 }
 
     // Sanitizar role filter - solo permite roles que el usuario actual puede ver
-    const userRole = session.user.role as UserRole
     const allowedRoles = getCreatableRoles(userRole)
     const roleFilter = searchParams.get('role')
     const sanitizedRole = roleFilter && allowedRoles.includes(roleFilter as UserRole) ? roleFilter : undefined
 
     // Filtrar por rol solo si es un rol que el usuario actual puede ver
-    let query = {}
+    // Y filtrar por pharmacy si es SUPERVISOR (solo puede ver usuarios de sus farmacias)
+    let query: Record<string, unknown> = {}
+    
     if (sanitizedRole) {
       query = { role: sanitizedRole }
     } else {
       // Si no hay filtro específico, solo mostrar roles de nivel inferior
       query = { role: { $in: allowedRoles } }
+    }
+    
+    // SUPERVISOR: filtrar también por farmacia asignada al supervisor
+    if (isSupervisor(userRole) && session.user.assignedPharmacies && session.user.assignedPharmacies.length > 0) {
+      query.assignedPharmacies = { $in: session.user.assignedPharmacies }
     }
 
     // Ejecutar query con paginación
@@ -71,9 +79,9 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
     const userRole = session?.user?.role as UserRole
     
-    // Verificar que el usuario tenga permisos de Admin o Super Admin
-    if (!session || (!isSuperAdmin(userRole) && !isAdmin(userRole))) {
-      return NextResponse.json({ error: 'No autorizado. Se requiere nivel Admin o Super Admin.' }, { status: 403 })
+    // Verificar que el usuario tenga permisos de Admin, Super Admin o Supervisor
+    if (!session || !hasPharmacyAccess(userRole)) {
+      return NextResponse.json({ error: 'No autorizado. Se requiere acceso de Admin o Supervisor.' }, { status: 403 })
     }
 
     const body = await req.json()

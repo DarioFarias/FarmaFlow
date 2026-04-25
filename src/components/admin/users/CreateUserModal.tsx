@@ -64,9 +64,21 @@ export default function CreateUserModal({
 
   // Determinar si el usuario actual (creador) es ENCARGADO
   const isCreatorEncargado = currentRole === UserRole.ENCARGADO
+  const isCreatorSupervisor = currentRole === UserRole.SUPERVISOR
   
   // Determinar si el creador (ENCARGADO) tiene farmacia asignada
   const creatorHasPharmacy = userAssignedPharmacies && userAssignedPharmacies.length > 0
+
+  // Filtrar farmacias disponibles según el rol del creador
+  // Si es SUPERVISOR, solo puede asignar de sus farmacias asignadas
+  // Fallback: si no tiene farmacias propias, mostrar todas (evitar UI vacía)
+  const availablePharmacies = isCreatorSupervisor && userAssignedPharmacies && userAssignedPharmacies.length > 0
+    ? pharmacies.filter(p => {
+        // Comparar como strings para evitar type mismatches
+        const pharmacyId = String(p._id)
+        return userAssignedPharmacies.includes(pharmacyId)
+      })
+    : pharmacies
 
   // Determinar si se puede seleccionar rol VENDEDOR
   // Solo si el creador NO es ENCARGADO, o si es ENCARGADO pero tiene farmacia
@@ -299,7 +311,7 @@ export default function CreateUserModal({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Farmacias Asignadas</label>
               <PharmacyCheckboxGroup
-                pharmacies={pharmacies}
+                pharmacies={availablePharmacies}
                 selected={formData.assignedPharmacies}
                 onChange={(selected) => setFormData({ ...formData, assignedPharmacies: selected })}
               />
@@ -328,7 +340,7 @@ export default function CreateUserModal({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
                 >
                   <option value="">Seleccionar farmacia</option>
-                  {pharmacies.map((pharmacy) => (
+                  {availablePharmacies.map((pharmacy) => (
                     <option key={pharmacy._id} value={pharmacy._id}>
                       {pharmacy.pharmacyName}
                     </option>

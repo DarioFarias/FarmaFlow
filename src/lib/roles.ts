@@ -245,6 +245,25 @@ export function validatePharmacyAssignment(
       }
     }
     
+    // Validación especial para SUPERVISOR creando usuario
+    if (creatorRole === UserRole.SUPERVISOR) {
+      if (!creatorAssignedPharmacies || creatorAssignedPharmacies.length === 0) {
+        return { 
+          valid: false, 
+          error: 'Un SUPERVISOR sin farmacia asignada no puede crear usuarios' 
+        }
+      }
+      
+      // SUPERVISOR solo puede asignar farmacias de su lista
+      const targetPharmacy = assignedPharmacies[0]
+      if (!creatorAssignedPharmacies.includes(targetPharmacy)) {
+        return { 
+          valid: false, 
+          error: 'Solo puedes asignar farmacias que te han sido asignadas' 
+        }
+      }
+    }
+    
     // Validación especial para VENDEDOR creado por ENCARGADO
     if (targetRole === UserRole.VENDEDOR && creatorRole === UserRole.ENCARGADO) {
       if (!creatorAssignedPharmacies || creatorAssignedPharmacies.length === 0) {

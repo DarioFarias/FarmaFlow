@@ -24,21 +24,14 @@ export function Sidebar({ role, assignedPharmacies, isOpen, setIsOpen, profileIm
     ? assignedPharmacies[0] 
     : 'Mi Farmacia'
 
-  const navItems = isAdmin
+  const navItems = isAdmin || isSupervisor
     ? [
         { name: 'Dashboard Global', href: '/dashboard', icon: LayoutDashboard },
         { name: 'Suministros', href: '/dashboard/suministros', icon: Package },
         { name: 'Auditoría Gastos', href: '/dashboard/gastos', icon: Receipt },
         { name: 'Farmacias', href: '/dashboard/admin/farmacias', icon: Users },
-        ...(isAdmin ? [{ name: 'Gestión Usuarios', href: '/dashboard/admin/usuarios', icon: UserCog }] : []),
+        ...(isAdmin || isSupervisor ? [{ name: 'Gestión Usuarios', href: '/dashboard/admin/usuarios', icon: UserCog }] : []),
       ]
-    : isSupervisor
-      ? [
-          { name: 'Inicio', href: '/dashboard', icon: Home },
-          { name: 'Mis Pedidos', href: '/dashboard/suministros', icon: Package },
-          { name: 'Mis Gastos', href: '/dashboard/gastos', icon: Receipt },
-          { name: 'Farmacias', href: '/dashboard/admin/farmacias', icon: Users },
-        ]
     : [
         { name: 'Inicio', href: '/dashboard', icon: Home },
         { name: 'Mis Pedidos', href: '/dashboard/suministros', icon: Package },
