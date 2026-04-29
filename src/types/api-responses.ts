@@ -74,6 +74,32 @@ export interface IPharmacyResponse {
   updatedAt: string | Date
 }
 
+// ---- USUARIO ASIGNADO A FARMACIA (para métricas) ----
+export interface IAssignedUser {
+  name: string
+  email?: string
+  role: string
+  isActive: boolean
+}
+
+// ---- RESUMEN MENSUAL DE FARMACIA ----
+export interface IMonthlySummary {
+  totalExpensesThisMonth: number
+  deliveredOrders: number
+  activeUsers: number
+  lastActivity: string | Date
+}
+
+// ---- FARMACIA CON MÉTRICAS (respuesta API) ----
+export interface IPharmacyMetrics extends Omit<IPharmacyResponse, 'createdAt' | 'updatedAt'> {
+  pendingSupplyRequests: number
+  pendingExpenses: number
+  assignedUsers: IAssignedUser[]
+  monthlySummary: IMonthlySummary
+  createdAt: string | Date
+  updatedAt: string | Date
+}
+
 // ---- USUARIO (respuesta API) ----
 export interface IUserResponse {
   _id: string
