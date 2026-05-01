@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
+import { useSession } from 'next-auth/react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createExpenseSchema, type CreateExpenseInput } from '@/lib/validations'
 import { ExpenseCategory } from '@/types'
@@ -10,6 +11,11 @@ import { toast } from 'react-hot-toast'
 import { Loader2, ArrowLeft, Camera, Send, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { compressImage } from '@/lib/image-utils'
+
+interface MyPharmacy {
+  pharmacyId: string
+  pharmacyName: string
+}
 
 const CATEGORIES = [
   { value: ExpenseCategory.UTILITIES, label: 'Luz, Agua, Gas, Internet' },
@@ -22,9 +28,39 @@ const CATEGORIES = [
 
 export function ExpenseForm() {
   const router = useRouter()
+  const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [myPharmacies, setMyPharmacies] = useState<MyPharmacy[]>([])
+  const [selectedPharmacyId, setSelectedPharmacyId] = useState<string>('')
+
+  // Cargar las pharmacies asignadas al usuario
+  useEffect(() => {
+    const fetchMyPharmacies = async () => {
+      try {
+        const res = await fetch('/api/my-pharmacies')
+        if (res.ok) {
+          const data = await res.json()
+          setMyPharmacies(data.data || [])
+
+          // Auto-seleccionar si solo tiene una pharmacy
+          if (data.data?.length === 1) {
+            setSelectedPharmacyId(data.data[0].pharmacyId)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching my pharmacies:', error)
+      }
+    }
+
+    if (session?.user?.assignedPharmacies?.length) {
+      fetchMyPharmacies()
+    }
+  }, [session])
+
+  const hasMultiplePharmacies = myPharmacies.length > 1
+  const currentPharmacy = myPharmacies.find(p => p.pharmacyId === selectedPharmacyId)
 
   const {
     register,
@@ -74,7 +110,7 @@ export function ExpenseForm() {
       // 1. Comprimir imagen (Requisito del usuario: ocupen el menor espacio)
       toast.loading('Comprimiendo imagen...', { id: 'expense-load' })
       const compressedBlob = await compressImage(selectedFile, 1000, 0.6)
-      
+
       // 2. Subir a Cloudinary
       toast.loading('Subiendo comprobante...', { id: 'expense-load' })
       const cloudData = await uploadToCloudinary(compressedBlob)
@@ -88,6 +124,10 @@ export function ExpenseForm() {
           ...data,
           invoiceImageUrl: cloudData.secure_url,
           invoicePublicId: cloudData.public_id,
+          // Incluir pharmacyId si el usuario tiene farmacias asignadas
+          ...(myPharmacies.length > 0 && selectedPharmacyId
+            ? { pharmacyId: selectedPharmacyId }
+            : {}),
         }),
       })
 
@@ -133,6 +173,27 @@ export function ExpenseForm() {
                 </div>
                 {errors.amount && <p className="text-xs text-red-500">{errors.amount.message}</p>}
               </div>
+
+              {/* Selector de Farmacia - solo mostrar si tiene 2+ */}
+              {hasMultiplePharmacies && (
+                <div className="space-y-2">
+                  <label className="label">Farmacia</label>
+                  <select
+                    value={selectedPharmacyId}
+                    onChange={(e) => setSelectedPharmacyId(e.target.value)}
+                    className="input"
+                    required
+                  >
+                    <option value="">Seleccionar farmacia...</option>
+                    {myPharmacies.map(p => (
+                      <option key={p.pharmacyId} value={p.pharmacyId}>
+                        {p.pharmacyName}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.category && <p className="text-xs text-red-500">{errors.category.message}</p>}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="label">Categoría</label>

@@ -147,6 +147,7 @@ export const createSupplyRequestSchema = z.object({
     .min(1, 'Debes agregar al menos un insumo'),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).default('NORMAL'),
   notes: z.string().max(1000).optional(),
+  pharmacyId: z.string().optional(), // ID de farmacia para asignar el pedido
 })
 
 export const updateSupplyStatusSchema = z.object({
@@ -168,6 +169,7 @@ export const createExpenseSchema = z.object({
   receiptDate: z.string().datetime(),
   invoiceImageUrl: z.string().url().optional(),
   invoicePublicId: z.string().optional(),
+  pharmacyId: z.string().optional(), // ID de farmacia para asignar el gasto
 })
 
 export const updateExpenseStatusSchema = z.object({

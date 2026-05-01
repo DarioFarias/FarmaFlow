@@ -31,12 +31,71 @@ export async function POST(req: NextRequest) {
 
     await connectDB()
 
-    // El nombre de la farmacia viene del nombre del usuario en la sesión
-    const pharmacyName = session.user.name
+    const { default: Pharmacy } = await import('@/models/Pharmacy')
+    const assignedPharmacies = session.user.assignedPharmacies || []
+    const { pharmacyId } = validation.data as { pharmacyId?: string }
+
+    let finalPharmacyId: string
+    let pharmacyName: string
+
+    if (pharmacyId) {
+      // Validar que el usuario tenga acceso a esta farmacia
+      if (!assignedPharmacies.includes(pharmacyId)) {
+        return NextResponse.json(
+          { error: 'No tienes acceso a esta farmacia' },
+          { status: 403 }
+        )
+      }
+
+      // Buscar la pharmacy por _id y verificar que existe y está activa
+      const pharmacyDoc = await Pharmacy.findOne({
+        _id: pharmacyId,
+        isActive: true,
+      })
+
+      if (!pharmacyDoc) {
+        // Verificar si existe pero está inactiva
+        const inactivePharmacy = await Pharmacy.findOne({ _id: pharmacyId })
+        if (inactivePharmacy) {
+          return NextResponse.json(
+            { error: 'La farmacia está inactiva' },
+            { status: 400 }
+          )
+        }
+        return NextResponse.json(
+          { error: 'Farmacia no encontrada' },
+          { status: 400 }
+        )
+      }
+
+      finalPharmacyId = pharmacyDoc._id.toString()
+      pharmacyName = pharmacyDoc.pharmacyName
+    } else {
+      // Backwards compatible: usar primera assignedPharmacy o fallback legacy
+      if (assignedPharmacies.length > 0) {
+        const pharmacyDoc = await Pharmacy.findOne({
+          _id: assignedPharmacies[0],
+          isActive: true,
+        })
+
+        if (pharmacyDoc) {
+          finalPharmacyId = pharmacyDoc._id.toString()
+          pharmacyName = pharmacyDoc.pharmacyName
+        } else {
+          // Pharmacy no existe o inactiva - usar legacy fallback
+          finalPharmacyId = session.user.id
+          pharmacyName = session.user.name || 'Farmacia'
+        }
+      } else {
+        // Sin assignedPharmacies - usar legacy fallback
+        finalPharmacyId = session.user.id
+        pharmacyName = session.user.name || 'Farmacia'
+      }
+    }
 
     const newRequest = await SupplyRequest.create({
       ...validation.data,
-      pharmacy: session.user.id,
+      pharmacy: finalPharmacyId,
       pharmacyName: pharmacyName,
       status: SupplyRequestStatus.REQUESTED,
       statusHistory: [

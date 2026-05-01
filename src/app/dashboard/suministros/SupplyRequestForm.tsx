@@ -1,14 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, useFieldArray } from 'react-hook-form'
+import { useSession } from 'next-auth/react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createSupplyRequestSchema, type CreateSupplyRequestInput } from '@/lib/validations'
 import { SupplyCategory } from '@/types'
 import { toast } from 'react-hot-toast'
 import { Loader2, ArrowLeft, Plus, Trash2, Send } from 'lucide-react'
 import Link from 'next/link'
+
+interface MyPharmacy {
+  pharmacyId: string
+  pharmacyName: string
+}
 
 const CATEGORIES = [
   { value: SupplyCategory.OFFICE_SUPPLIES, label: 'Papelería / Oficina' },
@@ -21,7 +27,36 @@ const UNITS = ['Unidades', 'Cajas', 'Packs', 'Litros', 'Kilos', 'Bolsas']
 
 export function SupplyRequestForm() {
   const router = useRouter()
+  const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
+  const [myPharmacies, setMyPharmacies] = useState<MyPharmacy[]>([])
+  const [selectedPharmacyId, setSelectedPharmacyId] = useState<string>('')
+
+  // Cargar las pharmacies asignadas al usuario
+  useEffect(() => {
+    const fetchMyPharmacies = async () => {
+      try {
+        const res = await fetch('/api/my-pharmacies')
+        if (res.ok) {
+          const data = await res.json()
+          setMyPharmacies(data.data || [])
+
+          // Auto-seleccionar si solo tiene una pharmacy
+          if (data.data?.length === 1) {
+            setSelectedPharmacyId(data.data[0].pharmacyId)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching my pharmacies:', error)
+      }
+    }
+
+    if (session?.user?.assignedPharmacies?.length) {
+      fetchMyPharmacies()
+    }
+  }, [session])
+
+  const hasMultiplePharmacies = myPharmacies.length > 1
 
   const {
     register,
@@ -47,7 +82,13 @@ export function SupplyRequestForm() {
       const response = await fetch('/api/supplies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          // Incluir pharmacyId si el usuario tiene farmacias asignadas
+          ...(myPharmacies.length > 0 && selectedPharmacyId
+            ? { pharmacyId: selectedPharmacyId }
+            : {}),
+        }),
       })
 
       if (!response.ok) {
@@ -77,6 +118,28 @@ export function SupplyRequestForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        {/* Selector de Farmacia - solo mostrar si tiene 2+ */}
+        {hasMultiplePharmacies && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="space-y-2">
+              <label className="label">Farmacia</label>
+              <select
+                value={selectedPharmacyId}
+                onChange={(e) => setSelectedPharmacyId(e.target.value)}
+                className="input"
+                required
+              >
+                <option value="">Seleccionar farmacia...</option>
+                {myPharmacies.map(p => (
+                  <option key={p.pharmacyId} value={p.pharmacyId}>
+                    {p.pharmacyName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-50 bg-gray-50/30 flex justify-between items-center">
             <div>
