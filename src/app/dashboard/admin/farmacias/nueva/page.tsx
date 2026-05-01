@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import { CreatePharmacyForm } from '../CreatePharmacyForm'
+import { PharmacyForm } from '@/components/admin/pharmacias/PharmacyForm'
 
 export const metadata: Metadata = {
   title: 'Nueva Farmacia',
@@ -16,7 +16,7 @@ export default function NuevaFarmaciaPage() {
         </p>
       </div>
 
-      <CreatePharmacyForm />
+      <PharmacyForm isEditMode={false} />
     </div>
   )
 }

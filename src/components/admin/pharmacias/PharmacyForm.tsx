@@ -2,51 +2,99 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { toast } from 'react-hot-toast'
-import { Loader2, ArrowLeft, Save, MapPin, Phone, Mail } from 'lucide-react'
+import { Loader2, ArrowLeft, Save, MapPin, Phone, Mail, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
+import { UserRole } from '@/types'
+import { isAdmin } from '@/lib/roles'
 
 interface PharmacyFormData {
   pharmacyName: string
-  address: string
-  phone: string
-  email: string
+  address?: string
+  phone?: string
+  email?: string
+  isActive?: boolean
+}
+
+interface PharmacyFormProps {
+  initialData?: PharmacyFormData
+  isEditMode?: boolean
+  onSuccess?: () => void
 }
 
 const initialFormData: PharmacyFormData = {
   pharmacyName: '',
-  address: '',
-  phone: '',
-  email: '',
+  address: undefined,
+  phone: undefined,
+  email: undefined,
+  isActive: true,
 }
 
-export function CreatePharmacyForm() {
+export function PharmacyForm({ initialData, isEditMode = false, onSuccess }: PharmacyFormProps) {
   const router = useRouter()
+  const { data: session } = useSession()
+  const userRole = session?.user?.role as UserRole | undefined
   const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState<PharmacyFormData>(initialFormData)
+  const [formData, setFormData] = useState<PharmacyFormData>(initialData || initialFormData)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Verificar permisos: solo ADMIN y SUPER_ADMIN pueden crear/editar farmacias
+  const hasPermission = isAdmin(userRole)
+  
+  // Mostrar mensaje de acceso denegado si el usuario no tiene permisos
+  if (!hasPermission) {
+    return (
+      <div className="max-w-2xl">
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+          <AlertTriangle size={48} className="mx-auto text-red-400 mb-4" />
+          <h2 className="text-lg font-semibold text-red-800 mb-2">Acceso Denegado</h2>
+          <p className="text-sm text-red-600">
+            No tienes permisos para {isEditMode ? 'editar' : 'crear'} farmacias. Solo los usuarios con rol ADMIN o SUPER_ADMIN pueden realizar esta acción.
+          </p>
+          <Link
+            href="/dashboard/admin/farmacias"
+            className="inline-flex items-center mt-4 text-sm text-brand-600 hover:text-brand-700 font-medium"
+          >
+            <ArrowLeft size={16} className="mr-1" />
+            Volver al listado
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setFormError(null)
-    
+
+    const method = isEditMode ? 'PATCH' : 'POST'
+    const url = isEditMode && initialData
+      ? `/api/admin/pharmacies/${(initialData as any)._id || (initialData as any).id}`
+      : '/api/admin/pharmacies'
+
     try {
-      const res = await fetch('/api/admin/pharmacies', {
-        method: 'POST',
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-      
+
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al crear farmacia')
-      
-      toast.success('Farmacia creada correctamente')
-      router.push('/dashboard/admin/farmacias')
-      router.refresh()
+      if (!res.ok) throw new Error(data.error || `Error al ${isEditMode ? 'actualizar' : 'crear'} farmacia`)
+
+      toast.success(isEditMode ? 'Farmacia actualizada correctamente' : 'Farmacia creada correctamente')
+
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        router.push('/dashboard/admin/farmacias')
+        router.refresh()
+      }
     } catch (error: any) {
-      setFormError(error.message || 'Error al crear farmacia')
-      toast.error(error.message || 'Error al crear farmacia')
+      setFormError(error.message || `Error al ${isEditMode ? 'actualizar' : 'crear'} farmacia`)
+      toast.error(error.message || `Error al ${isEditMode ? 'actualizar' : 'crear'} farmacia`)
     } finally {
       setIsLoading(false)
     }
@@ -55,7 +103,7 @@ export function CreatePharmacyForm() {
   return (
     <div className="max-w-2xl">
       <div className="mb-6">
-        <Link 
+        <Link
           href="/dashboard/admin/farmacias"
           className="inline-flex items-center text-sm text-gray-500 hover:text-brand-600 transition-colors"
         >
@@ -66,8 +114,12 @@ export function CreatePharmacyForm() {
 
       <form onSubmit={onSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-6">
         <div className="pb-4 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">Nueva Farmacia</h2>
-          <p className="text-sm text-gray-500">Agrega una nueva sucursal al sistema.</p>
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isEditMode ? 'Editar Farmacia' : 'Nueva Farmacia'}
+          </h2>
+          <p className="text-sm text-gray-500">
+            {isEditMode ? 'Modifica los datos de la sucursal.' : 'Agrega una nueva sucursal al sistema.'}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-4">
@@ -124,6 +176,24 @@ export function CreatePharmacyForm() {
               />
             </div>
           </div>
+
+          {isEditMode && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Estado</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500"
+                />
+                <label htmlFor="isActive" className="text-sm text-gray-600">
+                  Farmacia activa
+                </label>
+              </div>
+            </div>
+          )}
         </div>
 
         {formError && (
@@ -133,7 +203,7 @@ export function CreatePharmacyForm() {
         )}
 
         <div className="pt-4 flex justify-end gap-3">
-          <Link 
+          <Link
             href="/dashboard/admin/farmacias"
             className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
           >
@@ -145,7 +215,7 @@ export function CreatePharmacyForm() {
             className="btn-primary flex items-center gap-2 px-6"
           >
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-            Crear Farmacia
+            {isEditMode ? 'Guardar Cambios' : 'Crear Farmacia'}
           </button>
         </div>
       </form>

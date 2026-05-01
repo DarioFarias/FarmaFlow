@@ -1,9 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Phone, Mail, ChevronDown, ChevronUp } from 'lucide-react'
-import { IPharmacyMetrics } from '@/types/api-responses'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { MapPin, Phone, Mail, ChevronDown, ChevronUp, Trash2, AlertTriangle, Loader2, X } from 'lucide-react'
+import { IPharmacyMetrics } from '@/types/api-responses'
+import { useSession } from 'next-auth/react'
+import { UserRole } from '@/types'
+import { toast } from 'react-hot-toast'
 
 // =============================================
 // PharmacyCard Component
@@ -24,6 +28,15 @@ interface PharmacyCardProps {
 
 export function PharmacyCard({ pharmacy }: PharmacyCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const router = useRouter()
+  const { data: session } = useSession()
+
+  // Verificar si el usuario tiene permisos de edición (solo SUPER_ADMIN puede eliminar)
+  const userRole = session?.user?.role as UserRole | undefined
+  const canEdit = userRole === UserRole.SUPER_ADMIN || userRole === UserRole.ADMIN
+  const canDelete = userRole === UserRole.SUPER_ADMIN
 
   const {
     _id,
@@ -52,6 +65,26 @@ export function PharmacyCard({ pharmacy }: PharmacyCardProps) {
       month: '2-digit',
       year: 'numeric',
     })
+  }
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/pharmacies/${_id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al eliminar farmacia')
+      }
+      toast.success('Farmacia eliminada correctamente')
+      router.refresh()
+    } catch (error: any) {
+      toast.error(error.message || 'Error al eliminar farmacia')
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteModal(false)
+    }
   }
 
   return (
@@ -188,15 +221,73 @@ export function PharmacyCard({ pharmacy }: PharmacyCardProps) {
         </div>
       )}
 
-      {/* Footer */}
-      <div className="mt-4 pt-4 border-t border-gray-50 flex justify-end gap-2">
-        <Link
-          href={`/dashboard/admin/farmacias/${_id}/editar`}
-          className="text-sm text-brand-600 hover:text-brand-700 font-medium"
-        >
-          Editar
-        </Link>
-      </div>
+      {/* Footer - Solo mostrar para SUPER_ADMIN o ADMIN */}
+      {canEdit && (
+        <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between gap-2">
+          <div>
+            {canDelete && (
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+              >
+                <Trash2 size={14} />
+                Eliminar
+              </button>
+            )}
+          </div>
+          <Link
+            href={`/dashboard/admin/farmacias/${_id}/editar`}
+            className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+          >
+            Editar
+          </Link>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-red-100 rounded-full">
+                <AlertTriangle size={24} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Confirmar eliminación</h3>
+                <p className="text-sm text-gray-500">Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+            <p className="text-gray-600 mb-6">
+              ¿Estás seguro de que deseas eliminar la farmacia <strong>{pharmacyName}</strong>? 
+              La farmacia será marcada como inactiva.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+              >
+                {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                {isDeleting ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              disabled={isDeleting}
+              className="absolute top-2 right-2 p-2 text-gray-400 hover:text-gray-600 rounded-full"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,13 +3,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { Plus, Search, Loader2, X } from 'lucide-react'
+import { Plus, Search, Loader2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { IPharmacyMetrics } from '@/types/api-responses'
 import { PharmacyCard } from '@/components/admin/pharmacias/PharmacyCard'
 
 // =============================================
 // FarmaciasPage - Admin Pharmacy Management
-// With Search, Filter, Sort, and Metrics
+// With Search, Filter, Sort, Pagination, and Metrics
 // =============================================
 
 type StatusFilter = 'all' | 'active' | 'inactive'
@@ -23,6 +23,8 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'recent', label: 'Más recientes' },
 ]
 
+const PAGE_SIZE = 20
+
 export default function FarmaciasPage() {
   const { data: session } = useSession()
   const [farmacias, setFarmacias] = useState<IPharmacyMetrics[]>([])
@@ -32,6 +34,11 @@ export default function FarmaciasPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [sortBy, setSortBy] = useState<SortOption>('name-asc')
+  
+  // Pagination
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
   
   // Debounce timer
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null)
@@ -47,6 +54,7 @@ export default function FarmaciasPage() {
   // Handle search with 300ms debounce
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value)
+    setPage(1) // Reset to page 1 on search
     
     // Clear existing timer
     if (debounceTimer) {
@@ -55,7 +63,6 @@ export default function FarmaciasPage() {
     
     // Set new timer
     const timer = setTimeout(() => {
-      // Search applied via local filtering (not API)
       setIsLoading(true)
       fetchFarmacias()
     }, 300)
@@ -65,9 +72,26 @@ export default function FarmaciasPage() {
 
   const fetchFarmacias = async () => {
     try {
-      // Fetch both endpoints in parallel for performance
+      // Build query params - send to server-side API
+      const params = new URLSearchParams()
+      params.set('page', String(page))
+      params.set('pageSize', String(PAGE_SIZE))
+      
+      // Handle search via API if present
+      if (search) {
+        params.set('search', search)
+      }
+      
+      // Handle status filter
+      if (statusFilter === 'active') {
+        params.set('active', 'true')
+      } else if (statusFilter === 'inactive') {
+        params.set('active', 'false')
+      }
+      
+      // Fetch with pagination params
       const [listRes, metricsRes] = await Promise.all([
-        fetch('/api/admin/pharmacies'),
+        fetch(`/api/admin/pharmacies?${params.toString()}`),
         fetch('/api/admin/pharmacies/metrics'),
       ])
       
@@ -122,7 +146,7 @@ export default function FarmaciasPage() {
         }))
       }
 
-      // Apply client-side filtering for SUPERVISOR
+      // Apply client-side filtering for SUPERVISOR (still needed for metrics endpoint)
       if (isSupervisor && assignedPharmacies && assignedPharmacies.length > 0) {
         const assignedIds = assignedPharmacies.map(id => id.toString())
         farms = farms.filter(f => 
@@ -131,11 +155,42 @@ export default function FarmaciasPage() {
         )
       }
 
+      // Update pagination state from API response
+      if (listData?.totalPages) {
+        setTotalPages(listData.totalPages)
+      }
+      if (listData?.total !== undefined) {
+        setTotal(listData.total)
+      }
+      
       setFarmacias(farms)
     } catch (error) {
       console.error('Error fetching farmacias:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Handle filter/status changes - reset to page 1
+  const handleStatusFilterChange = (filter: StatusFilter) => {
+    setStatusFilter(filter)
+    setPage(1)
+    setIsLoading(true)
+    fetchFarmacias()
+  }
+
+  const handleSortChange = (newSort: SortOption) => {
+    setSortBy(newSort)
+    setPage(1)
+    setIsLoading(true)
+    fetchFarmacias()
+  }
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setPage(newPage)
+      setIsLoading(true)
+      fetchFarmacias()
     }
   }
 
