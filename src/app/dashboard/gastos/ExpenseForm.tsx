@@ -26,6 +26,9 @@ const CATEGORIES = [
   { value: ExpenseCategory.OTHER, label: 'Otros Gastos' },
 ]
 
+// Helper para verificar si es rol admin
+const isAdminRole = (role?: string) => role === 'ADMIN' || role === 'SUPER_ADMIN'
+
 export function ExpenseForm() {
   const router = useRouter()
   const { data: session } = useSession()
@@ -35,7 +38,12 @@ export function ExpenseForm() {
   const [myPharmacies, setMyPharmacies] = useState<MyPharmacy[]>([])
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string>('')
 
+  const userRole = session?.user?.role
+  const isAdmin = isAdminRole(userRole)
+
   // Cargar las pharmacies asignadas al usuario
+  // ADMIN/SUPER_ADMIN siempre cargan (reciben todas las pharmacies)
+  // Otros roles solo cargan si tienen assignedPharmacies
   useEffect(() => {
     const fetchMyPharmacies = async () => {
       try {
@@ -54,12 +62,16 @@ export function ExpenseForm() {
       }
     }
 
-    if (session?.user?.assignedPharmacies?.length) {
+    // Cargar siempre para ADMIN, o si tiene assignedPharmacies para otros roles
+    const hasAssignedPharmacies = (session?.user?.assignedPharmacies?.length ?? 0) > 0
+    if (isAdmin || hasAssignedPharmacies) {
       fetchMyPharmacies()
     }
-  }, [session])
+  }, [session, isAdmin])
 
-  const hasMultiplePharmacies = myPharmacies.length > 1
+  // ADMIN siempre ve el selector (aunque tenga 1 pharmacy)
+  // Otros roles ven el selector solo si tienen múltiples pharmacies
+  const showPharmacySelector = isAdmin || myPharmacies.length > 1
   const currentPharmacy = myPharmacies.find(p => p.pharmacyId === selectedPharmacyId)
 
   const {
@@ -174,15 +186,15 @@ export function ExpenseForm() {
                 {errors.amount && <p className="text-xs text-red-500">{errors.amount.message}</p>}
               </div>
 
-              {/* Selector de Farmacia - solo mostrar si tiene 2+ */}
-              {hasMultiplePharmacies && (
+              {/* Selector de Farmacia - mostrar para ADMIN o si tiene 2+ */}
+              {showPharmacySelector && myPharmacies.length > 0 && (
                 <div className="space-y-2">
                   <label className="label">Farmacia</label>
                   <select
                     value={selectedPharmacyId}
                     onChange={(e) => setSelectedPharmacyId(e.target.value)}
                     className="input"
-                    required
+                    required={isAdmin}
                   >
                     <option value="">Seleccionar farmacia...</option>
                     {myPharmacies.map(p => (

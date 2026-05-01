@@ -25,6 +25,9 @@ const CATEGORIES = [
 
 const UNITS = ['Unidades', 'Cajas', 'Packs', 'Litros', 'Kilos', 'Bolsas']
 
+// Helper para verificar si es rol admin
+const isAdminRole = (role?: string) => role === 'ADMIN' || role === 'SUPER_ADMIN'
+
 export function SupplyRequestForm() {
   const router = useRouter()
   const { data: session } = useSession()
@@ -32,7 +35,12 @@ export function SupplyRequestForm() {
   const [myPharmacies, setMyPharmacies] = useState<MyPharmacy[]>([])
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string>('')
 
+  const userRole = session?.user?.role
+  const isAdmin = isAdminRole(userRole)
+
   // Cargar las pharmacies asignadas al usuario
+  // ADMIN/SUPER_ADMIN siempre cargan (reciben todas las pharmacies)
+  // Otros roles solo cargan si tienen assignedPharmacies
   useEffect(() => {
     const fetchMyPharmacies = async () => {
       try {
@@ -51,12 +59,16 @@ export function SupplyRequestForm() {
       }
     }
 
-    if (session?.user?.assignedPharmacies?.length) {
+    // Cargar siempre para ADMIN, o si tiene assignedPharmacies para otros roles
+    const hasAssignedPharmacies = (session?.user?.assignedPharmacies?.length ?? 0) > 0
+    if (isAdmin || hasAssignedPharmacies) {
       fetchMyPharmacies()
     }
-  }, [session])
+  }, [session, isAdmin])
 
-  const hasMultiplePharmacies = myPharmacies.length > 1
+  // ADMIN siempre ve el selector (aunque tenga 1 pharmacy)
+  // Otros roles ven el selector solo si tienen múltiples pharmacies
+  const showPharmacySelector = isAdmin || myPharmacies.length > 1
 
   const {
     register,
@@ -118,8 +130,8 @@ export function SupplyRequestForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-        {/* Selector de Farmacia - solo mostrar si tiene 2+ */}
-        {hasMultiplePharmacies && (
+        {/* Selector de Farmacia - mostrar para ADMIN o si tiene 2+ */}
+        {showPharmacySelector && myPharmacies.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="space-y-2">
               <label className="label">Farmacia</label>
@@ -127,7 +139,7 @@ export function SupplyRequestForm() {
                 value={selectedPharmacyId}
                 onChange={(e) => setSelectedPharmacyId(e.target.value)}
                 className="input"
-                required
+                required={isAdmin}
               >
                 <option value="">Seleccionar farmacia...</option>
                 {myPharmacies.map(p => (

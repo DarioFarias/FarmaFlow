@@ -34,13 +34,16 @@ export async function POST(req: NextRequest) {
     const { default: Pharmacy } = await import('@/models/Pharmacy')
     const assignedPharmacies = session.user.assignedPharmacies || []
     const { pharmacyId } = validation.data as { pharmacyId?: string }
+    const userRole = session.user.role as UserRole
+    const isAdmin = userRole === UserRole.ADMIN || userRole === UserRole.SUPER_ADMIN
 
     let finalPharmacyId: string
     let pharmacyName: string
 
     if (pharmacyId) {
       // Validar que el usuario tenga acceso a esta farmacia
-      if (!assignedPharmacies.includes(pharmacyId)) {
+      // Para ADMIN, permitir cualquier pharmacy activa
+      if (!isAdmin && !assignedPharmacies.includes(pharmacyId)) {
         return NextResponse.json(
           { error: 'No tienes acceso a esta farmacia' },
           { status: 403 }
@@ -70,27 +73,34 @@ export async function POST(req: NextRequest) {
 
       finalPharmacyId = pharmacyDoc._id.toString()
       pharmacyName = pharmacyDoc.pharmacyName
-    } else {
-      // Backwards compatible: usar primera assignedPharmacy o fallback legacy
-      if (assignedPharmacies.length > 0) {
-        const pharmacyDoc = await Pharmacy.findOne({
-          _id: assignedPharmacies[0],
-          isActive: true,
-        })
+    } else if (isAdmin) {
+      // ADMIN sin pharmacyId: requerir pharmacyId explícitamente
+      return NextResponse.json(
+        { error: 'Debe seleccionar una farmacia para crear el pedido' },
+        { status: 400 }
+      )
+    } else if (assignedPharmacies.length > 0) {
+      // USER/SUPERVISOR: usar primera assignedPharmacy como fallback
+      const pharmacyDoc = await Pharmacy.findOne({
+        _id: assignedPharmacies[0],
+        isActive: true,
+      })
 
-        if (pharmacyDoc) {
-          finalPharmacyId = pharmacyDoc._id.toString()
-          pharmacyName = pharmacyDoc.pharmacyName
-        } else {
-          // Pharmacy no existe o inactiva - usar legacy fallback
-          finalPharmacyId = session.user.id
-          pharmacyName = session.user.name || 'Farmacia'
-        }
+      if (pharmacyDoc) {
+        finalPharmacyId = pharmacyDoc._id.toString()
+        pharmacyName = pharmacyDoc.pharmacyName
       } else {
-        // Sin assignedPharmacies - usar legacy fallback
-        finalPharmacyId = session.user.id
-        pharmacyName = session.user.name || 'Farmacia'
+        return NextResponse.json(
+          { error: 'No se encontró la farmacia asignada. Contacte al administrador.' },
+          { status: 400 }
+        )
       }
+    } else {
+      // Sin assignedPharmacies y no es admin: error
+      return NextResponse.json(
+        { error: 'No tienes farmacias asignadas. Contacte al administrador.' },
+        { status: 400 }
+      )
     }
 
     const newRequest = await SupplyRequest.create({
@@ -147,10 +157,10 @@ export async function GET(req: NextRequest) {
     else if (userRole === UserRole.SUPERVISOR) {
       const assignedPharmacies = session.user.assignedPharmacies || []
       if (assignedPharmacies.length > 0) {
-        // Filtar por pharmacyCode en la colección Pharmacy (no en User)
+        // Filtrar por _id en la colección Pharmacy (no en User)
         const { default: Pharmacy } = await import('@/models/Pharmacy')
         const assignedPharmaciesDocs = await Pharmacy.find({
-          pharmacyCode: { $in: assignedPharmacies },
+          _id: { $in: assignedPharmacies },
           isActive: true
         }).select('_id')
         const pharmacyIds = assignedPharmaciesDocs.map(p => p._id)
