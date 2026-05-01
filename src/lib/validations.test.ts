@@ -30,6 +30,7 @@ describe('Validations - Create User', () => {
   it('validates valid admin user', () => {
     const result = adminCreateUserSchema.safeParse({
       name: 'Admin User',
+      username: 'admin',
       email: 'admin@farmaflow.com',
       password: 'password123',
       role: 'ADMIN',
@@ -40,6 +41,7 @@ describe('Validations - Create User', () => {
   it('validates valid supervisor with assigned pharmacies', () => {
     const result = adminCreateUserSchema.safeParse({
       name: 'Supervisor Test',
+      username: 'supervisor',
       email: 'supervisor@farmaflow.com',
       password: 'password123',
       role: 'SUPERVISOR',
@@ -51,6 +53,7 @@ describe('Validations - Create User', () => {
   it('rejects short password', () => {
     const result = adminCreateUserSchema.safeParse({
       name: 'Test',
+      username: 'test',
       email: 'test@example.com',
       password: 'short',
     })
@@ -60,6 +63,7 @@ describe('Validations - Create User', () => {
   it('rejects invalid role', () => {
     const result = adminCreateUserSchema.safeParse({
       name: 'Test',
+      username: 'test',
       email: 'test@example.com',
       password: 'password123',
       role: 'INVALID_ROLE',
@@ -70,6 +74,7 @@ describe('Validations - Create User', () => {
   it('accepts optional phone field', () => {
     const result = adminCreateUserSchema.safeParse({
       name: 'Admin User',
+      username: 'admin',
       email: 'admin@farmaflow.com',
       password: 'password123',
       role: 'ADMIN',

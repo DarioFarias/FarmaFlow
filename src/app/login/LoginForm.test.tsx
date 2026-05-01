@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { LoginForm } from './LoginForm'
 import * as nextAuthReact from 'next-auth/react'
 
+// Mocks globales
+const mockPush = vi.fn()
+const mockRefresh = vi.fn()
+
 // Mock de next-auth/react
 vi.mock('next-auth/react', () => ({
   signIn: vi.fn(),
@@ -12,8 +16,8 @@ vi.mock('next-auth/react', () => ({
 // Mock de next/navigation
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
-    refresh: vi.fn(),
+    push: mockPush,
+    refresh: mockRefresh,
   }),
   useSearchParams: () => new URLSearchParams(),
 }))
@@ -32,30 +36,32 @@ describe('LoginForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     cleanup()
+    mockPush.mockClear()
+    mockRefresh.mockClear()
   })
 
   it('renderiza el formulario de login', () => {
     render(<LoginForm />)
     
-    expect(screen.getByLabelText(/correo electrónico/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/nombre de usuario/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /entrAR ahora/i })).toBeInTheDocument()
   })
 
-  it('valida email inválido', async () => {
+  it('valida username inválido (menos de 3 caracteres)', async () => {
     const user = userEvent.setup()
     render(<LoginForm />)
 
-    const emailInput = screen.getByLabelText(/correo electrónico/i)
+    const usernameInput = screen.getByLabelText(/nombre de usuario/i)
     const passwordInput = screen.getByLabelText(/contraseña/i)
     const submitButton = screen.getByRole('button', { name: /entrAR ahora/i })
 
-    await user.type(emailInput, 'invalid-email')
+    await user.type(usernameInput, 'ab')
     await user.type(passwordInput, 'password123')
     await user.click(submitButton)
 
     await waitFor(() => {
-      expect(screen.getByText(/email válido/i)).toBeInTheDocument()
+      expect(screen.getByText(/al menos 3 caracteres/i)).toBeInTheDocument()
     })
   })
 
@@ -63,11 +69,11 @@ describe('LoginForm', () => {
     const user = userEvent.setup()
     render(<LoginForm />)
 
-    const emailInput = screen.getByLabelText(/correo electrónico/i)
+    const usernameInput = screen.getByLabelText(/nombre de usuario/i)
     const passwordInput = screen.getByLabelText(/contraseña/i)
     const submitButton = screen.getByRole('button', { name: /entrAR ahora/i })
 
-    await user.type(emailInput, 'test@example.com')
+    await user.type(usernameInput, 'testuser')
     await user.type(passwordInput, 'short')
     await user.click(submitButton)
 
@@ -85,11 +91,11 @@ describe('LoginForm', () => {
 
     render(<LoginForm />)
 
-    const emailInput = screen.getByLabelText(/correo electrónico/i)
+    const usernameInput = screen.getByLabelText(/nombre de usuario/i)
     const passwordInput = screen.getByLabelText(/contraseña/i)
     const submitButton = screen.getByRole('button', { name: /entrAR ahora/i })
 
-    await user.type(emailInput, 'wrong@example.com')
+    await user.type(usernameInput, 'wronguser')
     await user.type(passwordInput, 'wrongpassword')
     await user.click(submitButton)
 
@@ -97,7 +103,7 @@ describe('LoginForm', () => {
       expect(mockSignIn).toHaveBeenCalledWith(
         'credentials',
         expect.objectContaining({
-          email: 'wrong@example.com',
+          username: 'wronguser',
           password: 'wrongpassword',
           redirect: false,
         })
@@ -107,16 +113,6 @@ describe('LoginForm', () => {
 
   it('redirige cuando credenciales son válidas', async () => {
     const user = userEvent.setup()
-    const mockPush = vi.fn()
-    const mockRefresh = vi.fn()
-
-    vi.mock('next/navigation', () => ({
-      useRouter: () => ({
-        push: mockPush,
-        refresh: mockRefresh,
-      }),
-      useSearchParams: () => new URLSearchParams(),
-    }))
 
     mockSignIn.mockResolvedValue({
       error: null,
@@ -125,11 +121,11 @@ describe('LoginForm', () => {
 
     render(<LoginForm />)
 
-    const emailInput = screen.getByLabelText(/correo electrónico/i)
+    const usernameInput = screen.getByLabelText(/nombre de usuario/i)
     const passwordInput = screen.getByLabelText(/contraseña/i)
     const submitButton = screen.getByRole('button', { name: /entrAR ahora/i })
 
-    await user.type(emailInput, 'valid@example.com')
+    await user.type(usernameInput, 'validuser')
     await user.type(passwordInput, 'validpassword')
     await user.click(submitButton)
 
