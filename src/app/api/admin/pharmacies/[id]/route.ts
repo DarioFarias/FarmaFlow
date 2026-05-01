@@ -3,18 +3,28 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import Pharmacy from '@/models/Pharmacy'
-import { isSuperAdmin, isAdmin } from '@/lib/roles'
+import { isSuperAdmin, isAdmin, isSupervisor, hasPharmacyAccess } from '@/lib/roles'
 import { UserRole } from '@/types'
 import { pharmacyUpdateSchema } from '@/lib/validations'
 import { z } from 'zod'
+import mongoose from 'mongoose'
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // Validar ObjectId
+    const { isValidObjectId } = mongoose
+    if (!isValidObjectId(params.id)) {
+      return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+    }
+
     const session = await getServerSession(authOptions)
-    if (!session || (!isSuperAdmin(session.user.role as UserRole) && !isAdmin(session.user.role as UserRole))) {
+    const userRole = session?.user?.role as UserRole | undefined
+
+    // Verificar acceso: Admin, Super Admin o Supervisor pueden acceder
+    if (!session || !hasPharmacyAccess(userRole)) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
@@ -23,6 +33,14 @@ export async function GET(
 
     if (!pharmacy) {
       return NextResponse.json({ error: 'Farmacia no encontrada' }, { status: 404 })
+    }
+
+    // Si es Supervisor, verificar que la pharmacy esté en sus assignedPharmacies
+    if (isSupervisor(userRole)) {
+      const assignedPharmacies = session.user.assignedPharmacies as string[] | undefined
+      if (!assignedPharmacies || !assignedPharmacies.includes(params.id)) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+      }
     }
 
     return NextResponse.json(pharmacy)
@@ -37,9 +55,16 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Validar ObjectId
+    const { isValidObjectId } = mongoose
+    if (!isValidObjectId(params.id)) {
+      return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+    }
+
     const session = await getServerSession(authOptions)
+    // Solo Admin y Super Admin pueden editar (no Supervisor)
     if (!session || (!isSuperAdmin(session.user.role as UserRole) && !isAdmin(session.user.role as UserRole))) {
-      return NextResponse.json({ error: 'No授权' }, { status: 403 })
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }
 
     const body = await req.json()
@@ -97,7 +122,14 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Validar ObjectId
+    const { isValidObjectId } = mongoose
+    if (!isValidObjectId(params.id)) {
+      return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
+    }
+
     const session = await getServerSession(authOptions)
+    // Solo Admin y Super Admin pueden eliminar (no Supervisor)
     if (!session || (!isSuperAdmin(session.user.role as UserRole) && !isAdmin(session.user.role as UserRole))) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
     }

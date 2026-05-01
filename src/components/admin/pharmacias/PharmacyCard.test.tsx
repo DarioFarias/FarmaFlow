@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PharmacyCard } from './PharmacyCard'
 import { IPharmacyMetrics } from '@/types/api-responses'
+import { SessionProvider } from 'next-auth/react'
 
 // =============================================
 // Tests para PharmacyCard Component
@@ -12,6 +13,21 @@ import { IPharmacyMetrics } from '@/types/api-responses'
 vi.mock('next/link', () => ({
   default: ({ href, children }: any) => <a href={href}>{children}</a>,
 }))
+
+// Mock de next-auth/react
+vi.mock('next-auth/react', () => ({
+  useSession: () => ({ data: null, status: 'unauthenticated' }),
+  SessionProvider: ({ children }: any) => children,
+}))
+
+// Helper para renderizar con sesión
+const renderWithSession = (component: React.ReactElement, session: any) => {
+  return render(
+    <SessionProvider session={session}>
+      {component}
+    </SessionProvider>
+  )
+}
 
 describe('PharmacyCard', () => {
   const mockPharmacy: IPharmacyMetrics = {
@@ -127,7 +143,7 @@ describe('PharmacyCard', () => {
   })
 
   // ========== EDIT LINK ==========
-  
+
   describe('Edit link', () => {
     it('renders Editar link', () => {
       render(<PharmacyCard pharmacy={mockPharmacy} />)
@@ -138,6 +154,181 @@ describe('PharmacyCard', () => {
       render(<PharmacyCard pharmacy={mockPharmacy} />)
       const editLink = screen.getByText('Editar').closest('a')
       expect(editLink).toHaveAttribute('href', '/dashboard/admin/farmacias/pharm-123/editar')
+    })
+  })
+
+  // ========== PERMISOS POR ROL ==========
+
+  describe('Permisos por rol', () => {
+    // Tests para SUPER_ADMIN
+    describe('SUPER_ADMIN role', () => {
+      it('shows Ver link for SUPER_ADMIN', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'SUPER_ADMIN' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.getByText('Ver')).toBeInTheDocument()
+      })
+
+      it('shows Editar link for SUPER_ADMIN', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'SUPER_ADMIN' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.getByText('Editar')).toBeInTheDocument()
+      })
+
+      it('shows Eliminar button for SUPER_ADMIN', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'SUPER_ADMIN' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.getByText('Eliminar')).toBeInTheDocument()
+      })
+    })
+
+    // Tests para ADMIN
+    describe('ADMIN role', () => {
+      it('shows Ver link for ADMIN', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'ADMIN' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.getByText('Ver')).toBeInTheDocument()
+      })
+
+      it('shows Editar link for ADMIN', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'ADMIN' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.getByText('Editar')).toBeInTheDocument()
+      })
+
+      it('does NOT show Eliminar button for ADMIN (only SUPER_ADMIN)', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'ADMIN' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Eliminar')).not.toBeInTheDocument()
+      })
+    })
+
+    // Tests para SUPERVISOR
+    describe('SUPERVISOR role', () => {
+      it('shows Ver link for SUPERVISOR', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'SUPERVISOR' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.getByText('Ver')).toBeInTheDocument()
+      })
+
+      it('does NOT show Editar link for SUPERVISOR', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'SUPERVISOR' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Editar')).not.toBeInTheDocument()
+      })
+
+      it('does NOT show Eliminar button for SUPERVISOR', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'SUPERVISOR' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Eliminar')).not.toBeInTheDocument()
+      })
+    })
+
+    // Tests para VENDEDOR
+    describe('VENDEDOR role', () => {
+      it('does NOT show Ver link for VENDEDOR', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'VENDEDOR' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Ver')).not.toBeInTheDocument()
+      })
+
+      it('does NOT show Editar link for VENDEDOR', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'VENDEDOR' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Editar')).not.toBeInTheDocument()
+      })
+
+      it('does NOT show Eliminar button for VENDEDOR', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'VENDEDOR' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Eliminar')).not.toBeInTheDocument()
+      })
+    })
+
+    // Tests para ENCARGADO
+    describe('ENCARGADO role', () => {
+      it('does NOT show Ver link for ENCARGADO', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'ENCARGADO' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Ver')).not.toBeInTheDocument()
+      })
+
+      it('does NOT show Editar link for ENCARGADO', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'ENCARGADO' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Editar')).not.toBeInTheDocument()
+      })
+
+      it('does NOT show Eliminar button for ENCARGADO', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: { user: { role: 'ENCARGADO' } },
+          status: 'authenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Eliminar')).not.toBeInTheDocument()
+      })
+    })
+
+    // Tests sin sesión (no autenticado)
+    describe('No autenticado', () => {
+      it('does NOT show Ver link when no session', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: null,
+          status: 'unauthenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Ver')).not.toBeInTheDocument()
+      })
+
+      it('does NOT show Editar link when no session', () => {
+        vi.mocked(require('next-auth/react').useSession).mockReturnValue({
+          data: null,
+          status: 'unauthenticated',
+        })
+        render(<PharmacyCard pharmacy={mockPharmacy} />)
+        expect(screen.queryByText('Editar')).not.toBeInTheDocument()
+      })
     })
   })
 })

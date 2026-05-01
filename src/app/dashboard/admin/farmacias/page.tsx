@@ -282,12 +282,13 @@ export default function FarmaciasPage() {
           {(['all', 'active', 'inactive'] as const).map((filter) => (
             <button
               key={filter}
-              onClick={() => setStatusFilter(filter)}
+              onClick={() => handleStatusFilterChange(filter)}
+              disabled={isLoading}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
                 statusFilter === filter
                   ? 'bg-white text-brand-600 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
-              }`}
+              } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {filter === 'all' ? 'Todas' : filter === 'active' ? 'Activas' : 'Inactivas'}
             </button>
@@ -297,8 +298,9 @@ export default function FarmaciasPage() {
         {/* Sort Dropdown */}
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as SortOption)}
-          className="ml-auto px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          onChange={(e) => handleSortChange(e.target.value as SortOption)}
+          disabled={isLoading}
+          className={`ml-auto px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {SORT_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -326,6 +328,42 @@ export default function FarmaciasPage() {
           ))
         )}
       </div>
+
+      {/* Pagination UI */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4">
+          <div className="text-sm text-gray-500">
+            Página <span className="font-medium text-gray-900">{page}</span> de <span className="font-medium text-gray-900">{totalPages}</span>
+            {total > 0 && <span className="ml-2">({total} resultados)</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1 || isLoading}
+              className={`flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                page === 1
+                  ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300'
+              } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <ChevronLeft size={16} />
+              <span>Anterior</span>
+            </button>
+            <button
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page === totalPages || isLoading}
+              className={`flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                page === totalPages
+                  ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300'
+              } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span>Siguiente</span>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

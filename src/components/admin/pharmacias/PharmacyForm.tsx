@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { toast } from 'react-hot-toast'
@@ -8,6 +8,7 @@ import { Loader2, ArrowLeft, Save, MapPin, Phone, Mail, AlertTriangle } from 'lu
 import Link from 'next/link'
 import { UserRole } from '@/types'
 import { isAdmin } from '@/lib/roles'
+import { validateMexicanPhone } from '@/lib/validations'
 
 interface PharmacyFormData {
   pharmacyName: string
@@ -38,10 +39,28 @@ export function PharmacyForm({ initialData, isEditMode = false, onSuccess }: Pha
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState<PharmacyFormData>(initialData || initialFormData)
   const [formError, setFormError] = useState<string | null>(null)
+  const [phoneError, setPhoneError] = useState<string | null>(null)
 
   // Verificar permisos: solo ADMIN y SUPER_ADMIN pueden crear/editar farmacias
   const hasPermission = isAdmin(userRole)
   
+  // Validación de teléfono en tiempo real
+  const handlePhoneChange = useCallback((value: string) => {
+    setFormData({ ...formData, phone: value })
+    
+    if (!value || value.trim() === '') {
+      setPhoneError(null)
+      return
+    }
+    
+    const result = validateMexicanPhone(value)
+    if (!result.valid) {
+      setPhoneError(result.error || 'Teléfono inválido')
+    } else {
+      setPhoneError(null)
+    }
+  }, [formData])
+
   // Mostrar mensaje de acceso denegado si el usuario no tiene permisos
   if (!hasPermission) {
     return (
@@ -68,6 +87,16 @@ export function PharmacyForm({ initialData, isEditMode = false, onSuccess }: Pha
     e.preventDefault()
     setIsLoading(true)
     setFormError(null)
+
+    // Validar teléfono antes de enviar
+    if (formData.phone && formData.phone.trim() !== '') {
+      const phoneResult = validateMexicanPhone(formData.phone)
+      if (!phoneResult.valid) {
+        setPhoneError(phoneResult.error || 'Teléfono inválido')
+        setIsLoading(false)
+        return
+      }
+    }
 
     const method = isEditMode ? 'PATCH' : 'POST'
     const url = isEditMode && initialData
@@ -152,15 +181,23 @@ export function PharmacyForm({ initialData, isEditMode = false, onSuccess }: Pha
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">Teléfono</label>
             <div className="relative">
-              <Phone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Phone size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${phoneError ? 'text-red-400' : 'text-gray-400'}`} />
               <input
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-                placeholder="+54 11 1234 5678"
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-1 focus:ring-brand-500 outline-none ${
+                  phoneError ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                }`}
+                placeholder="+52 55 1234 5678"
               />
             </div>
+            {phoneError && (
+              <p className="text-xs text-red-600 flex items-center gap-1">
+                <AlertTriangle size={12} />
+                {phoneError}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { UserRole, IUser, IPharmacy } from '@/types'
-import { X, Loader2, Check } from 'lucide-react'
+import { X, Loader2, Check, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import PharmacyCheckboxGroup from './PharmacyCheckboxGroup'
 import { getPharmacyAssignmentType } from '@/lib/roles'
+import { validateMexicanPhone } from '@/lib/validations'
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error'
 
@@ -53,6 +54,7 @@ export default function EditUserModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [phoneError, setPhoneError] = useState<string | null>(null)
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle')
   const [usernameChecking, setUsernameChecking] = useState(false)
 

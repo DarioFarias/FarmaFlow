@@ -2,11 +2,12 @@
 
 import { useState, useMemo } from 'react'
 import { UserRole, IPharmacy } from '@/types'
-import { X, Loader2, Check } from 'lucide-react'
+import { X, Loader2, Check, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import PharmacyCheckboxGroup from './PharmacyCheckboxGroup'
 import { getPharmacyAssignmentType, PharmacyAssignmentType } from '@/lib/roles'
+import { validateMexicanPhone } from '@/lib/validations'
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error'
 
@@ -53,6 +54,7 @@ export default function CreateUserModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [phoneError, setPhoneError] = useState<string | null>(null)
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle')
   const [usernameChecking, setUsernameChecking] = useState(false)
 
@@ -138,6 +140,7 @@ export default function CreateUserModal({
     setFormData(initialFormData)
     setShowPassword(false)
     setFormError(null)
+    setPhoneError(null)
     setUsernameStatus('idle')
     setUsernameChecking(false)
   }
@@ -146,6 +149,16 @@ export default function CreateUserModal({
     e.preventDefault()
     setIsSubmitting(true)
     setFormError(null)
+
+    // Validar teléfono antes de enviar
+    if (formData.phone && formData.phone.trim() !== '') {
+      const phoneResult = validateMexicanPhone(formData.phone)
+      if (!phoneResult.valid) {
+        setPhoneError(phoneResult.error || 'Teléfono inválido')
+        setIsSubmitting(false)
+        return
+      }
+    }
 
     const submitData = { ...formData }
     if (currentRole === UserRole.ENCARGADO && formData.role === UserRole.VENDEDOR && userAssignedPharmacies) {
@@ -355,10 +368,33 @@ export default function CreateUserModal({
             <input
               type="tel"
               value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none"
-              placeholder="+54 11 1234 5678"
+              onChange={(e) => {
+                const value = e.target.value
+                setFormData({ ...formData, phone: value })
+                
+                if (!value || value.trim() === '') {
+                  setPhoneError(null)
+                  return
+                }
+                
+                const result = validateMexicanPhone(value)
+                if (!result.valid) {
+                  setPhoneError(result.error || 'Teléfono inválido')
+                } else {
+                  setPhoneError(null)
+                }
+              }}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-1 focus:ring-brand-500 outline-none ${
+                phoneError ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
+              placeholder="+52 55 1234 5678"
             />
+            {phoneError && (
+              <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                <AlertTriangle size={12} />
+                {phoneError}
+              </p>
+            )}
           </div>
           {formError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
