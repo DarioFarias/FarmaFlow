@@ -99,6 +99,7 @@ ExpenseSchema.pre('save', async function (this: IExpenseDocument, next) {
 
 // ---- ÍNDICES ----
 ExpenseSchema.index({ pharmacy: 1, createdAt: -1 })
+ExpenseSchema.index({ pharmacy: 1, status: 1 }) // Índice compuesto para métricas
 ExpenseSchema.index({ status: 1 })
 ExpenseSchema.index({ expenseNumber: 1 })
 ExpenseSchema.index({ category: 1 })

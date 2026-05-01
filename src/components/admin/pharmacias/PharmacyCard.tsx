@@ -33,9 +33,15 @@ export function PharmacyCard({ pharmacy }: PharmacyCardProps) {
   const router = useRouter()
   const { data: session } = useSession()
 
-  // Verificar si el usuario tiene permisos de edición (solo SUPER_ADMIN puede eliminar)
+  // Verificar permisos de usuario
+  // - ADMIN/SUPER_ADMIN: pueden VER y EDITAR
+  // - SUPERVISOR: solo puede VER (no editar)
+  // - VENDEDOR/ENCARGADO: sin acceso
   const userRole = session?.user?.role as UserRole | undefined
-  const canEdit = userRole === UserRole.SUPER_ADMIN || userRole === UserRole.ADMIN
+  const isAdmin = userRole === UserRole.SUPER_ADMIN || userRole === UserRole.ADMIN
+  const isSupervisor = userRole === UserRole.SUPERVISOR
+  const canView = isAdmin || isSupervisor // ADMIN, SUPER_ADMIN y SUPERVISOR pueden ver
+  const canEdit = isAdmin // Solo ADMIN y SUPER_ADMIN pueden editar
   const canDelete = userRole === UserRole.SUPER_ADMIN
 
   const {
@@ -221,10 +227,10 @@ export function PharmacyCard({ pharmacy }: PharmacyCardProps) {
         </div>
       )}
 
-      {/* Footer - Solo mostrar para SUPER_ADMIN o ADMIN */}
-      {canEdit && (
+      {/* Footer - Solo mostrar para usuarios con permisos (ADMIN, SUPER_ADMIN, SUPERVISOR) */}
+      {canView && (
         <div className="mt-4 pt-4 border-t border-gray-50 flex justify-between gap-2">
-          <div>
+          <div className="flex gap-3">
             {canDelete && (
               <button
                 onClick={() => setShowDeleteModal(true)}
@@ -235,12 +241,24 @@ export function PharmacyCard({ pharmacy }: PharmacyCardProps) {
               </button>
             )}
           </div>
-          <Link
-            href={`/dashboard/admin/farmacias/${_id}/editar`}
-            className="text-sm text-brand-600 hover:text-brand-700 font-medium"
-          >
-            Editar
-          </Link>
+          <div className="flex gap-3">
+            {/* Link "Ver" visible para todos los que pueden view (ADMIN, SUPER_ADMIN, SUPERVISOR) */}
+            <Link
+              href={`/dashboard/admin/farmacias/${_id}`}
+              className="text-sm text-gray-600 hover:text-gray-700 font-medium"
+            >
+              Ver
+            </Link>
+            {/* Link "Editar" solo para ADMIN y SUPER_ADMIN (no para SUPERVISOR) */}
+            {canEdit && (
+              <Link
+                href={`/dashboard/admin/farmacias/${_id}/editar`}
+                className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+              >
+                Editar
+              </Link>
+            )}
+          </div>
         </div>
       )}
 

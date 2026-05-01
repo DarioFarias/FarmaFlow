@@ -11,6 +11,106 @@ import {
 // Fuente única para validación de API y formularios (client + server)
 // =============================================
 
+// =============================================
+// VALIDACIÓN DE TELÉFONOS MEXICANOS
+// =============================================
+
+/**
+ * Valida y normaliza números telefónicos móviles de México
+ * Formatos válidos:
+ *   - +52 55 1234 5678 (internacional con espacios)
+ *   - +525512345678 (internacional sin espacios)
+ *   - 55 1234 5678 (local con LADA y espacios)
+ *   - 5512345678 (local sin espacios)
+ *   - 1234567890 (10 dígitos sin prefijo)
+ *
+ * Características:
+ * - Acepta prefijo +52 opcional
+ * - Solo acepta dígitos (sin guiones, puntos, paréntesis)
+ * - Longitud exacta: 10 dígitos sin prefijo, 12 dígitos con +52
+ * - Rechaza formatos argentinos/europeos
+ *
+ * @returns { valid: true, normalized: string } | { valid: false, error: string }
+ */
+export function validateMexicanPhone(
+  phone: string
+): { valid: boolean; normalized?: string; error?: string } {
+  // Si no viene nada, es válido (campo opcional)
+  if (!phone || phone.trim() === '') {
+    return { valid: true, normalized: undefined }
+  }
+
+  const normalized = phone.trim()
+
+  // Remover TODOS los espacios
+  const digitsOnly = normalized.replace(/\s/g, '')
+
+  // Validar que soloenga dígitos y opcionalmente +
+  if (!/^\+?\d+$/.test(digitsOnly)) {
+    return { valid: false, error: 'El teléfono solo puede contener dígitos' }
+  }
+
+  // Extraer los dígitos puros (sin el +)
+  const digits = digitsOnly.replace(/^\+/, '')
+
+  let finalDigits: string
+  let hasCountryCode = false
+
+  // Verificar si tiene prefijo de país +52
+  if (digits.startsWith('52') && digits.length === 12) {
+    // Tiene +52: 12 dígitos total (52 + 10 dígitos locales)
+    hasCountryCode = true
+    finalDigits = digits // 12 dígitos con prefijo
+  } else if (digits.length === 10) {
+    // Sin prefijo: 10 dígitos locales
+    finalDigits = digits
+  } else {
+    return {
+      valid: false,
+      error: `El teléfono debe tener 10 dígitos (o 12 con +52), recibido: ${digits.length}`,
+    }
+  }
+
+  // Extraer código de área y número (últimos 10 dígitos para almacenamiento)
+  // Si tiene prefijo +52, usamos los últimos 10 dígitos
+  const phoneForStorage = hasCountryCode ? finalDigits.slice(-10) : finalDigits
+
+  // Validar estructura del número mexicano
+  // Área: 2-3 dígitos, Número: 7-8 dígitos
+  const areaCode = phoneForStorage.slice(0, 3)
+  const phoneNumber = phoneForStorage.slice(3)
+
+  // Código de área válido (2-3 dígitos, starts with 2-9 o 1 para códigos de 3 dígitos)
+  // Números válidos de 7-8 dígitos
+  if (!/^\d{2,3}$/.test(areaCode) || !/^\d{7,8}$/.test(phoneNumber)) {
+    return {
+      valid: false,
+      error: 'Teléfono móvil mexicano inválido',
+    }
+  }
+
+// Normalizar: siempre almacenar los 10 dígitos locales sin prefijo
+  return { valid: true, normalized: phoneForStorage }
+}
+
+/**
+ * Schema Zod para validación de teléfono mexicano
+ * Uso: phone: mexicanPhoneSchema
+ */
+export const mexicanPhoneSchema = z
+  .string()
+  .max(20)
+  .trim()
+  .optional()
+  .refine(
+    (val) => {
+      if (!val || val.trim() === '') return true // Optional
+      const result = validateMexicanPhone(val)
+      return result.valid
+    },
+    { message: 'Teléfono móvil mexicano inválido' }
+  )
+
 // ---- SCHEMAS DE SANITIZACIÓN (Security) ----
 
 // Regex para sanitizar strings: permite solo letras, números, espacios, guiones
@@ -75,7 +175,7 @@ export const pharmacyCreateSchema = z.object({
     .max(100, 'Máximo 100 caracteres')
     .trim(),
   address: z.string().max(200).trim().optional(),
-  phone: z.string().max(30).trim().optional(),
+  phone: mexicanPhoneSchema,
   email: z.string().email('Email inválido').toLowerCase().trim().optional().or(z.literal('')),
 })
 
@@ -86,7 +186,7 @@ export const pharmacyUpdateSchema = z.object({
     .trim()
     .optional(),
   address: z.string().max(200).trim().optional(),
-  phone: z.string().max(30).trim().optional(),
+  phone: mexicanPhoneSchema,
   email: z.string().email().toLowerCase().trim().optional(),
   isActive: z.boolean().optional(),
 })
@@ -111,7 +211,7 @@ export const adminCreateUserSchema = z.object({
   role: z.enum(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN', 'ENCARGADO', 'VENDEDOR'], {
     errorMap: () => ({ message: 'Rol inválido' }),
   }),
-  phone: z.string().max(30).trim().optional(),
+  phone: mexicanPhoneSchema,
   assignedPharmacies: z.array(z.string()).max(50).default([]),
 })
 
@@ -121,7 +221,7 @@ export const adminUpdateUserSchema = z.object({
   username: z.string().min(3).max(30).trim().optional(),
   email: z.string().email().toLowerCase().trim().optional().or(z.literal('')),
   role: z.enum(['ADMIN', 'SUPERVISOR', 'SUPER_ADMIN', 'ENCARGADO', 'VENDEDOR']).optional(),
-  phone: z.string().max(30).trim().optional(),
+  phone: mexicanPhoneSchema,
   assignedPharmacies: z.array(z.string()).optional(),
   isActive: z.boolean().optional(),
 })

@@ -88,8 +88,8 @@ export interface IUser {
   profileImage?: string     // URL de Cloudinary
   profileImagePublicId?: string // ID de Cloudinary para gestión
   assignedPharmacies?: string[] // Códigos de farmacia asignados (SUPERVISOR, ADMIN, ENCARGADO, etc.)
-  // Campos legacy de backwards compatibility - migrados a colección Pharmacy
-  pharmacyName?: string
+  pharmacyName?: string    // Legacy - migrado a colección Pharmacy (campo opcional para backwards compatibility)
+  /** @deprecated Este campo fue migrado a colección Pharmacy. No usar en nuevo código. */
   pharmacyCode?: string
   createdAt: Date
   updatedAt: Date

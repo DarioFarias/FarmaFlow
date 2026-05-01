@@ -47,7 +47,6 @@ export async function POST(req: NextRequest) {
     }
 
     const { name, email, password, phone } = validation.data
-    // NOTE: pharmacyName y pharmacyCode ya no se usan - las farmacias están en colección Pharmacy
 
     await connectDB()
 

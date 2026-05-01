@@ -81,16 +81,6 @@ export async function PATCH(
       user.email = emailValue || undefined
     }
     if (validated.role !== undefined) user.role = validated.role as UserRole
-    // NOTE: pharmacyName y pharmacyCode ya no existen en IUser (las farmacias están en colección Pharmacy)
-    // if (validated.pharmacyName !== undefined) user.pharmacyName = validated.pharmacyName
-    // if (validated.pharmacyCode !== undefined) {
-    //   // Verificar pharmacyCode único
-    //   const existingCode = await User.findOne({ pharmacyCode: validated.pharmacyCode, _id: { $ne: id } })
-    //   if (existingCode) {
-    //     return NextResponse.json({ error: 'El código de sucursal ya está en uso' }, { status: 400 })
-    //   }
-    //   user.pharmacyCode = validated.pharmacyCode
-    // }
     if (validated.phone !== undefined) user.phone = validated.phone
     if (validated.isActive !== undefined) user.isActive = validated.isActive
     if (validated.assignedPharmacies !== undefined) user.assignedPharmacies = validated.assignedPharmacies

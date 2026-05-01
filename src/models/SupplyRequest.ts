@@ -152,6 +152,7 @@ SupplyRequestSchema.pre('save', async function (this: ISupplyRequestDocument, ne
 
 // ---- ÍNDICES ----
 SupplyRequestSchema.index({ pharmacy: 1, createdAt: -1 })
+SupplyRequestSchema.index({ pharmacy: 1, status: 1 }) // Índice compuesto para métricas
 SupplyRequestSchema.index({ status: 1 })
 SupplyRequestSchema.index({ requestNumber: 1 })
 SupplyRequestSchema.index({ priority: 1 })

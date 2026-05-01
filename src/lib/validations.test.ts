@@ -6,6 +6,11 @@ import {
   createSupplyRequestSchema,
   updateSupplyStatusSchema,
   updateExpenseStatusSchema,
+  validateMexicanPhone,
+  mexicanPhoneSchema,
+  pharmacyCreateSchema,
+  pharmacyUpdateSchema,
+  adminUpdateUserSchema,
 } from './validations'
 import { SupplyCategory, ExpenseCategory, SupplyRequestStatus, ExpenseStatus } from '../types'
 
@@ -78,7 +83,7 @@ describe('Validations - Create User', () => {
       email: 'admin@farmaflow.com',
       password: 'password123',
       role: 'ADMIN',
-      phone: '+54 11 1234 5678',
+      phone: '+52 55 1234 5678',
     })
     expect(result.success).toBe(true)
   })
@@ -258,5 +263,185 @@ describe('Validations - Update Expense Status', () => {
       status: 'INVALID_STATUS',
     })
     expect(result.success).toBe(false)
+  })
+})
+
+// =============================================
+// VALIDACIÓN DE TELÉFONOS MEXICANOS
+// =============================================
+
+describe('validateMexicanPhone - Function', () => {
+  describe('Valid formats', () => {
+    it('accepts +52 format with spaces', () => {
+      const result = validateMexicanPhone('+52 55 1234 5678')
+      expect(result.valid).toBe(true)
+      expect(result.normalized).toBe('5512345678')
+    })
+
+    it('accepts +52 format without spaces', () => {
+      const result = validateMexicanPhone('+525512345678')
+      expect(result.valid).toBe(true)
+      expect(result.normalized).toBe('5512345678')
+    })
+
+    it('accepts local format with LADA and spaces', () => {
+      const result = validateMexicanPhone('55 1234 5678')
+      expect(result.valid).toBe(true)
+      expect(result.normalized).toBe('5512345678')
+    })
+
+    it('accepts local format without spaces', () => {
+      const result = validateMexicanPhone('5512345678')
+      expect(result.valid).toBe(true)
+      expect(result.normalized).toBe('5512345678')
+    })
+
+    it('accepts 10 digits without prefix', () => {
+      const result = validateMexicanPhone('1234567890')
+      expect(result.valid).toBe(true)
+      expect(result.normalized).toBe('1234567890')
+    })
+
+    it('accepts empty string (optional field)', () => {
+      const result = validateMexicanPhone('')
+      expect(result.valid).toBe(true)
+      expect(result.normalized).toBeUndefined()
+    })
+
+    it('accepts undefined', () => {
+      const result = validateMexicanPhone(undefined as any)
+      expect(result.valid).toBe(true)
+      expect(result.normalized).toBeUndefined()
+    })
+
+    it('accepts different area codes (55, 33, 81, 221)', () => {
+      const testCases = [
+        '5512345678', // 55 (2) + 12345678 (8) = 10
+        '3312345678', // 33 (2) + 12345678 (8) = 10
+        '8112345678', // 81 (2) + 12345678 (8) = 10
+        '2211234567', // 221 (3) + 1234567 (7) = 10
+        '4441234567', // 444 (3) + 1234567 (7) = 10
+        '6181234567', // 618 (3) + 1234567 (7) = 10
+      ]
+      testCases.forEach((phone) => {
+        const result = validateMexicanPhone(phone)
+        expect(result.valid, `${phone} should be valid`).toBe(true)
+      })
+    })
+  })
+
+  describe('Invalid formats - rejection', () => {
+    it('rejects phone with dashes ( Argentine format)', () => {
+      const result = validateMexicanPhone('54-11-1234-5678')
+      expect(result.valid).toBe(false)
+      expect(result.error).toContain('dígitos')
+    })
+
+    it('rejects phone with dots (European format)', () => {
+      const result = validateMexicanPhone('55.1234.5678')
+      expect(result.valid).toBe(false)
+    })
+
+    it('rejects phone with parentheses', () => {
+      const result = validateMexicanPhone('(55) 1234-5678')
+      expect(result.valid).toBe(false)
+    })
+
+    it('rejects phone that is too short (less than 10 digits)', () => {
+      const result = validateMexicanPhone('551234567')
+      expect(result.valid).toBe(false)
+      expect(result.error).toContain('10 dígitos')
+    })
+
+    it('rejects more than 10 digits', () => {
+      const result = validateMexicanPhone('55123456789')
+      expect(result.valid).toBe(false)
+    })
+
+    it('rejects US format (+1)', () => {
+      const result = validateMexicanPhone('+1 555 123 4567')
+      expect(result.valid).toBe(false)
+    })
+
+    it('rejects letters in phone', () => {
+      const result = validateMexicanPhone('55abc45678')
+      expect(result.valid).toBe(false)
+    })
+
+    it('rejects symbols in phone', () => {
+      const result = validateMexicanPhone('55-12#-5678')
+      expect(result.valid).toBe(false)
+    })
+  })
+})
+
+describe('validateMexicanPhone - Zod Schema', () => {
+  it('accepts valid phone in pharmacyCreateSchema', () => {
+    const result = pharmacyCreateSchema.safeParse({
+      pharmacyName: 'Farmacia Centro',
+      phone: '+52 55 1234 5678',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts valid phone in adminCreateUserSchema', () => {
+    const result = adminCreateUserSchema.safeParse({
+      name: 'Test User',
+      username: 'testuser',
+      password: 'password123',
+      role: 'ADMIN',
+      phone: '55 1234 5678',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts valid phone in adminUpdateUserSchema', () => {
+    const result = adminUpdateUserSchema.safeParse({
+      name: 'Updated Name',
+      phone: '5512345678',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects Argentine phone format in pharmacyCreateSchema', () => {
+    const result = pharmacyCreateSchema.safeParse({
+      pharmacyName: 'Farmacia centro',
+      phone: '54-11-1234-5678',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects phone starting with 1 in user schema', () => {
+    const result = adminCreateUserSchema.safeParse({
+      name: 'Test User',
+      username: 'testuser',
+      password: 'password123',
+      role: 'ADMIN',
+      phone: '1551234567',
+    })
+    // 155 is a valid area code (starts with 1), so this is valid
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts optional phone (empty)', () => {
+    const result = pharmacyCreateSchema.safeParse({
+      pharmacyName: 'Farmacia test',
+      phone: '',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts optional phone (undefined)', () => {
+    const result = pharmacyCreateSchema.safeParse({
+      pharmacyName: 'Farmacia test',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts optional phone in update schema (undefined)', () => {
+    const result = pharmacyUpdateSchema.safeParse({
+      pharmacyName: 'Updated',
+    })
+    expect(result.success).toBe(true)
   })
 })

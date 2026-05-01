@@ -45,14 +45,13 @@ const UserSchema = new Schema<IUserDocument>(
       default: UserRole.SUPERVISOR,
       required: true,
     },
-    // NOTE: pharmacyName y pharmacyCode fueron movidos a colección Pharmacy
-    // Se mantienen como campos opcionales para backwards compatibility con datos existentes
-    // La nueva vía de acceso es a través de la colección Pharmacy
     pharmacyName: {
       type: String,
       trim: true,
       default: undefined,
     },
+    // Campo legacy en DB - NO está en IUser (migrado a colección Pharmacy)
+    // Incluido aquí para backward compatibility con scripts de migración existentes
     pharmacyCode: {
       type: String,
       trim: true,
