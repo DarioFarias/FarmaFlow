@@ -85,7 +85,7 @@ export function validateMexicanPhone(
   if (!/^\d{2,3}$/.test(areaCode) || !/^\d{7,8}$/.test(phoneNumber)) {
     return {
       valid: false,
-      error: 'Teléfono móvil mexicano inválido',
+      error: 'Teléfono inválido',
     }
   }
 
@@ -108,7 +108,7 @@ export const mexicanPhoneSchema = z
       const result = validateMexicanPhone(val)
       return result.valid
     },
-    { message: 'Teléfono móvil mexicano inválido' }
+    { message: 'Teléfono inválido' }
   )
 
 // ---- SCHEMAS DE SANITIZACIÓN (Security) ----

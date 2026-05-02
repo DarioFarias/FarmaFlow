@@ -22,8 +22,8 @@ export async function POST(req: NextRequest) {
 
     await connectDB()
 
-    // Obtener el usuario actual de la sesión
-    const user = await User.findById(session.user.id)
+    // Obtener el usuario actual de la sesión (incluir password con select:+)
+    const user = await User.findById(session.user.id).select('+password')
 
     if (!user) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 })

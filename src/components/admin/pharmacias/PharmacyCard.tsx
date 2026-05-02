@@ -8,6 +8,7 @@ import { IPharmacyMetrics } from '@/types/api-responses'
 import { useSession } from 'next-auth/react'
 import { UserRole } from '@/types'
 import { toast } from 'react-hot-toast'
+import AdminConfirmModal from '@/components/admin/users/AdminConfirmModal'
 
 // =============================================
 // PharmacyCard Component
@@ -30,8 +31,11 @@ interface PharmacyCardProps {
 }
 
 export function PharmacyCard({ pharmacy, onView, onEdit, onDeleteSuccess }: PharmacyCardProps) {
+  // Usar estado local para reflejar inmediatamente los cambios
+  const [localIsActive, setLocalIsActive] = useState(pharmacy.isActive)
   const [isExpanded, setIsExpanded] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isReactivating, setIsReactivating] = useState(false)
   const router = useRouter()
@@ -54,7 +58,6 @@ export function PharmacyCard({ pharmacy, onView, onEdit, onDeleteSuccess }: Phar
     address,
     phone,
     email,
-    isActive,
     pendingSupplyRequests,
     pendingExpenses,
     assignedUsers,
@@ -78,6 +81,11 @@ export function PharmacyCard({ pharmacy, onView, onEdit, onDeleteSuccess }: Phar
   }
 
   const handleDelete = async () => {
+    // Primero mostrar modal de contraseña
+    setShowPasswordModal(true)
+  }
+
+  const handleConfirmDelete = async () => {
     setIsDeleting(true)
     try {
       const res = await fetch(`/api/admin/pharmacies/${_id}`, {
@@ -87,6 +95,8 @@ export function PharmacyCard({ pharmacy, onView, onEdit, onDeleteSuccess }: Phar
       if (!res.ok) {
         throw new Error(data.error || 'Error al eliminar farmacia')
       }
+      // Actualizar estado local para reflejar el cambio
+      setLocalIsActive(false)
       toast.success('Farmacia eliminada correctamente')
       onDeleteSuccess?.()
       router.refresh()
@@ -95,6 +105,7 @@ export function PharmacyCard({ pharmacy, onView, onEdit, onDeleteSuccess }: Phar
     } finally {
       setIsDeleting(false)
       setShowDeleteModal(false)
+      setShowPasswordModal(false)
     }
   }
 
@@ -110,6 +121,8 @@ export function PharmacyCard({ pharmacy, onView, onEdit, onDeleteSuccess }: Phar
       if (!res.ok) {
         throw new Error(data.error || 'Error al reactivas')
       }
+      // Actualizar estado local inmediatamente
+      setLocalIsActive(true)
       toast.success('Farmacia reactivada correctamente')
       onDeleteSuccess?.()
       router.refresh()
@@ -129,7 +142,7 @@ export function PharmacyCard({ pharmacy, onView, onEdit, onDeleteSuccess }: Phar
             ID: {String(_id).slice(-8)}
           </span>
         </div>
-        {isActive ? (
+        {localIsActive ? (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700">
             Activa
           </span>
@@ -286,7 +299,7 @@ export function PharmacyCard({ pharmacy, onView, onEdit, onDeleteSuccess }: Phar
               </Link>
             )}
             {/* Botón "Reactivar" solo para ADMIN y SUPER_ADMIN cuando la farmacia está inactiva */}
-            {canEdit && !isActive && (
+            {canEdit && !localIsActive && (
               <button
                 onClick={handleReactivate}
                 disabled={isReactivating}
@@ -366,6 +379,16 @@ export function PharmacyCard({ pharmacy, onView, onEdit, onDeleteSuccess }: Phar
           </div>
         </div>
       )}
+
+      {/* Modal de confirmación de contraseña para eliminar */}
+      <AdminConfirmModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
+        title="Confirmar eliminación"
+        message={`Para eliminar la farmacia "${pharmacyName}", confirma tu contraseña.`}
+      />
     </div>
   )
 }

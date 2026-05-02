@@ -103,10 +103,11 @@ export default function FarmaciasPage() {
         params.set('active', 'false')
       }
       
-      // Fetch with pagination params
+      // Fetch with pagination params - no-store para evitar caché del navegador
+      // Importante: si veo problemas de rendimiento, revisar este cambio
       const [listRes, metricsRes] = await Promise.all([
-        fetch(`/api/admin/pharmacies?${params.toString()}`),
-        fetch('/api/admin/pharmacies/metrics'),
+        fetch(`/api/admin/pharmacies?${params.toString()}`, { cache: 'no-store' }),
+        fetch('/api/admin/pharmacies/metrics', { cache: 'no-store' }),
       ])
       
       const listData = await listRes.json()
