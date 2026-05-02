@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { UserRole, IPharmacy } from '@/types'
-import { X, Loader2, Check, AlertTriangle } from 'lucide-react'
+import { X, Loader2, Check, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import clsx from 'clsx'
 import toast from 'react-hot-toast'
 import PharmacyCheckboxGroup from './PharmacyCheckboxGroup'
@@ -277,7 +277,7 @@ export default function CreateUserModal({
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                {showPassword ? <X size={18} /> : <X size={18} />}
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>

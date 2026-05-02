@@ -32,6 +32,9 @@ export async function GET(req: NextRequest) {
     })
     const { page, pageSize } = pagination.success ? pagination.data : { page: 1, pageSize: 20 }
 
+    // Sanitizar search query
+    const searchQuery = searchParams.get('search')?.trim() || ''
+
     // Sanitizar role filter - solo permite roles que el usuario actual puede ver
     const allowedRoles = getCreatableRoles(userRole)
     const roleFilter = searchParams.get('role')
@@ -53,6 +56,15 @@ export async function GET(req: NextRequest) {
       query.assignedPharmacies = { $in: session.user.assignedPharmacies }
     }
 
+    // Agregar filtro de búsqueda si existe
+    if (searchQuery) {
+      query.$or = [
+        { name: { $regex: searchQuery, $options: 'i' } },
+        { username: { $regex: searchQuery, $options: 'i' } },
+        { email: { $regex: searchQuery, $options: 'i' } },
+      ]
+    }
+
     // Ejecutar query con paginación
     const skip = (page - 1) * pageSize
     const [users, total] = await Promise.all([
@@ -60,7 +72,7 @@ export async function GET(req: NextRequest) {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(pageSize)
-        .select('name email role isActive phone assignedPharmacies profileImage createdAt'),
+        .select('name username email role isActive phone assignedPharmacies profileImage createdAt'),
       User.countDocuments(query),
     ])
 

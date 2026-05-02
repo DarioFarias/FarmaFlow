@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { Users, Shield, Plus, Loader2 } from 'lucide-react'
+import { Users, Shield, Plus, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { UserRole, IUser, IPharmacy } from '@/types'
 import { getCreatableRoles } from '@/lib/roles'
 import toast from 'react-hot-toast'
@@ -20,6 +20,9 @@ export default function UsuariosAdminPage() {
   const [pharmacies, setPharmacies] = useState<IPharmacy[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   // Roles del usuario actual
   const currentRole = session?.user?.role as UserRole | undefined
@@ -35,8 +38,7 @@ export default function UsuariosAdminPage() {
   const creatableRoles = getCreatableRoles(session?.user?.role as UserRole)
 
   useEffect(() => {
-    // Fetch paralelo para mejor rendimiento
-    Promise.all([fetchUsers(), fetchPharmacies()])
+    fetchPharmacies()
   }, [])
 
   const fetchPharmacies = async () => {
@@ -56,18 +58,29 @@ export default function UsuariosAdminPage() {
     }
   }
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (page = 1, search = '') => {
     try {
-      const res = await fetch('/api/admin/users')
+      // Construir query params
+      const params = new URLSearchParams()
+      params.set('page', page.toString())
+      params.set('pageSize', '20')
+      if (search) {
+        params.set('search', search)
+      }
+
+      const res = await fetch(`/api/admin/users?${params.toString()}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al obtener usuarios')
       
-      // La API devuelve formato paginado: { data: [...], total, page, pageSize }
+      // La API devuelve formato paginado: { data: [...], total, page, pageSize, totalPages }
       if (data && Array.isArray(data.data)) {
         setUsers(data.data)
+        setTotalPages(data.totalPages || 1)
+        setCurrentPage(data.page || 1)
       } else if (Array.isArray(data)) {
         // Compatibilidad con API legacy que devuelve array directo
         setUsers(data)
+        setTotalPages(1)
       } else {
         throw new Error('Formato de datos incorrecto')
       }
@@ -79,6 +92,23 @@ export default function UsuariosAdminPage() {
       setIsLoading(false)
     }
   }
+
+  // Debounce para búsqueda
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+      setCurrentPage(1) // Resetear a página 1 al buscar
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // Fetch users cuando cambia la búsqueda o página
+  useEffect(() => {
+    fetchUsers(currentPage, debouncedSearch)
+  }, [currentPage, debouncedSearch])
 
   const handleUpdateRole = async (userId: string, newRole: UserRole) => {
     setActionId(userId)
@@ -151,10 +181,23 @@ export default function UsuariosAdminPage() {
             Administración centralizada de usuarios del sistema.
           </p>
         </div>
-        <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
-          <Plus size={18} />
-          <span>Nuevo Usuario</span>
-        </button>
+        <div className="flex items-center gap-4">
+          {/* Input de búsqueda */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Buscar por nombre, usuario o email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-500 outline-none w-64"
+            />
+          </div>
+          <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
+            <Plus size={18} />
+            <span>Nuevo Usuario</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -183,6 +226,31 @@ export default function UsuariosAdminPage() {
             />
           </tbody>
         </table>
+        
+        {/* Controles de paginación */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+            <div className="text-sm text-gray-500">
+              Página {currentPage} de {totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modals */}

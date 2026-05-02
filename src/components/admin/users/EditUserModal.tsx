@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import PharmacyCheckboxGroup from './PharmacyCheckboxGroup'
 import { getPharmacyAssignmentType } from '@/lib/roles'
 import { validateMexicanPhone } from '@/lib/validations'
+import AdminConfirmModal from './AdminConfirmModal'
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error'
 
@@ -57,6 +58,7 @@ export default function EditUserModal({
   const [phoneError, setPhoneError] = useState<string | null>(null)
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle')
   const [usernameChecking, setUsernameChecking] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
 
   // Determinar el tipo de asignación de farmacias según el rol seleccionado
   const assignmentType = useMemo(() => 
@@ -116,8 +118,31 @@ export default function EditUserModal({
     }
   }
 
+  // Detectar cambios críticos (username, email, role)
+  const hasCriticalChanges = () => {
+    if (!user) return false
+    return (
+      formData.username !== user.username ||
+      formData.email !== (user.email || '') ||
+      formData.role !== user.role
+    )
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user) return
+    
+    // Si hay cambios críticos, mostrar modal de confirmación
+    if (hasCriticalChanges()) {
+      setShowConfirmModal(true)
+      return
+    }
+    
+    // Si no hay cambios críticos, proceder directamente
+    await saveUser('')
+  }
+
+  const saveUser = async (password: string) => {
     if (!user) return
     setIsSubmitting(true)
     setFormError(null)
@@ -154,6 +179,7 @@ export default function EditUserModal({
       if (!res.ok) throw new Error(data.error || data.details || 'Error al actualizar usuario')
       
       toast.success('Usuario actualizado correctamente')
+      setShowConfirmModal(false)
       onSuccess()
       onClose()
     } catch (error) {
@@ -341,6 +367,16 @@ export default function EditUserModal({
           </div>
         </form>
       </div>
+
+      {/* Modal de confirmación para cambios críticos */}
+      <AdminConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={saveUser}
+        isLoading={isSubmitting}
+        title="Confirmar cambios críticos"
+        message={`Estás a punto de modificar datos importantes del usuario ${user.name}. ¿Confirmas los cambios en username, email o rol?`}
+      />
     </div>
   )
 }
