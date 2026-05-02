@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MapPin, Phone, Mail, ChevronDown, ChevronUp, Trash2, AlertTriangle, Loader2, X } from 'lucide-react'
+import { MapPin, Phone, Mail, ChevronDown, ChevronUp, Trash2, AlertTriangle, Loader2, X, RotateCcw } from 'lucide-react'
 import { IPharmacyMetrics } from '@/types/api-responses'
 import { useSession } from 'next-auth/react'
 import { UserRole } from '@/types'
@@ -24,12 +24,16 @@ const getMetricColor = (count: number): string => {
 
 interface PharmacyCardProps {
   pharmacy: IPharmacyMetrics
+  onView?: (pharmacy: IPharmacyMetrics) => void
+  onEdit?: (pharmacy: IPharmacyMetrics) => void
+  onDeleteSuccess?: () => void
 }
 
-export function PharmacyCard({ pharmacy }: PharmacyCardProps) {
+export function PharmacyCard({ pharmacy, onView, onEdit, onDeleteSuccess }: PharmacyCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isReactivating, setIsReactivating] = useState(false)
   const router = useRouter()
   const { data: session } = useSession()
 
@@ -84,12 +88,35 @@ export function PharmacyCard({ pharmacy }: PharmacyCardProps) {
         throw new Error(data.error || 'Error al eliminar farmacia')
       }
       toast.success('Farmacia eliminada correctamente')
+      onDeleteSuccess?.()
       router.refresh()
     } catch (error: any) {
       toast.error(error.message || 'Error al eliminar farmacia')
     } finally {
       setIsDeleting(false)
       setShowDeleteModal(false)
+    }
+  }
+
+  const handleReactivate = async () => {
+    setIsReactivating(true)
+    try {
+      const res = await fetch(`/api/admin/pharmacies/${_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al reactivas')
+      }
+      toast.success('Farmacia reactivada correctamente')
+      onDeleteSuccess?.()
+      router.refresh()
+    } catch (error: any) {
+      toast.error(error.message || 'Error al reactivas')
+    } finally {
+      setIsReactivating(false)
     }
   }
 
@@ -243,20 +270,53 @@ export function PharmacyCard({ pharmacy }: PharmacyCardProps) {
           </div>
           <div className="flex gap-3">
             {/* Link "Ver" visible para todos los que pueden view (ADMIN, SUPER_ADMIN, SUPERVISOR) */}
-            <Link
-              href={`/dashboard/admin/farmacias/${_id}`}
-              className="text-sm text-gray-600 hover:text-gray-700 font-medium"
-            >
-              Ver
-            </Link>
+            {onView ? (
+              <button
+                onClick={() => onView(pharmacy)}
+                className="text-sm text-gray-600 hover:text-gray-700 font-medium"
+              >
+                Ver
+              </button>
+            ) : (
+              <Link
+                href={`/dashboard/admin/farmacias/${_id}`}
+                className="text-sm text-gray-600 hover:text-gray-700 font-medium"
+              >
+                Ver
+              </Link>
+            )}
+            {/* Botón "Reactivar" solo para ADMIN y SUPER_ADMIN cuando la farmacia está inactiva */}
+            {canEdit && !isActive && (
+              <button
+                onClick={handleReactivate}
+                disabled={isReactivating}
+                className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
+              >
+                {isReactivating ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <RotateCcw size={14} />
+                )}
+                Reactivar
+              </button>
+            )}
             {/* Link "Editar" solo para ADMIN y SUPER_ADMIN (no para SUPERVISOR) */}
             {canEdit && (
-              <Link
-                href={`/dashboard/admin/farmacias/${_id}/editar`}
-                className="text-sm text-brand-600 hover:text-brand-700 font-medium"
-              >
-                Editar
-              </Link>
+              onEdit ? (
+                <button
+                  onClick={() => onEdit(pharmacy)}
+                  className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+                >
+                  Editar
+                </button>
+              ) : (
+                <Link
+                  href={`/dashboard/admin/farmacias/${_id}/editar`}
+                  className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+                >
+                  Editar
+                </Link>
+              )
             )}
           </div>
         </div>

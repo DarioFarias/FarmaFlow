@@ -6,6 +6,9 @@ import { useSession } from 'next-auth/react'
 import { Plus, Search, Loader2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { IPharmacyMetrics } from '@/types/api-responses'
 import { PharmacyCard } from '@/components/admin/pharmacias/PharmacyCard'
+import CreatePharmacyModal from '@/components/admin/farmacias/CreatePharmacyModal'
+import EditPharmacyModal from '@/components/admin/farmacias/EditPharmacyModal'
+import PharmacyDetailsModal from '@/components/admin/farmacias/PharmacyDetailsModal'
 
 // =============================================
 // FarmaciasPage - Admin Pharmacy Management
@@ -42,6 +45,17 @@ export default function FarmaciasPage() {
   
   // Debounce timer
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null)
+  
+  // Modal states
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [selectedPharmacy, setSelectedPharmacy] = useState<IPharmacyMetrics | null>(null)
+  
+  // Callback ref for refreshing after modal actions
+  const refreshData = useCallback(() => {
+    fetchFarmacias()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   
   const userRole = session?.user?.role
   const assignedPharmacies = session?.user?.assignedPharmacies as string[] | undefined
@@ -194,6 +208,29 @@ export default function FarmaciasPage() {
     }
   }
 
+  // Modal handlers
+  const handleCreate = () => {
+    setIsCreateModalOpen(true)
+  }
+
+  const handleEdit = (pharmacy: IPharmacyMetrics) => {
+    setSelectedPharmacy(pharmacy)
+    setIsEditModalOpen(true)
+  }
+
+  const handleView = (pharmacy: IPharmacyMetrics) => {
+    setSelectedPharmacy(pharmacy)
+    setIsDetailsModalOpen(true)
+  }
+
+  const handleDeleteSuccess = () => {
+    fetchFarmacias()
+  }
+
+  const handleModalSuccess = () => {
+    fetchFarmacias()
+  }
+
   // Apply filters and sort
   const filteredFarmacias = Array.isArray(farmacias) ? farmacias.filter(f => {
     // Search filter
@@ -244,10 +281,10 @@ export default function FarmaciasPage() {
             Gestiona las sucursales en el sistema ({filteredFarmacias.length} {statusFilter === 'all' ? 'registradas' : statusFilter === 'active' ? 'activas' : 'inactivas'}).
           </p>
         </div>
-        <Link href="/dashboard/admin/farmacias/nueva" className="btn-primary flex items-center gap-2">
+        <button onClick={handleCreate} className="btn-primary flex items-center gap-2">
           <Plus size={18} />
           <span>Nueva Farmacia</span>
-        </Link>
+        </button>
       </div>
 
       {/* Search Input */}
@@ -324,7 +361,13 @@ export default function FarmaciasPage() {
           </div>
         ) : (
           filteredFarmacias.map((f) => (
-            <PharmacyCard key={f._id} pharmacy={f} />
+            <PharmacyCard 
+              key={f._id} 
+              pharmacy={f}
+              onView={handleView}
+              onEdit={handleEdit}
+              onDeleteSuccess={handleDeleteSuccess}
+            />
           ))
         )}
       </div>
@@ -364,6 +407,34 @@ export default function FarmaciasPage() {
           </div>
         </div>
       )}
+
+      {/* Modals */}
+      <CreatePharmacyModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleModalSuccess}
+      />
+      <EditPharmacyModal
+        isOpen={isEditModalOpen}
+        pharmacy={selectedPharmacy}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setSelectedPharmacy(null)
+        }}
+        onSuccess={handleModalSuccess}
+      />
+      <PharmacyDetailsModal
+        isOpen={isDetailsModalOpen}
+        pharmacy={selectedPharmacy}
+        onClose={() => {
+          setIsDetailsModalOpen(false)
+          setSelectedPharmacy(null)
+        }}
+        onEdit={(pharmacy) => {
+          setIsDetailsModalOpen(false)
+          handleEdit(pharmacy)
+        }}
+      />
     </div>
   )
 }
