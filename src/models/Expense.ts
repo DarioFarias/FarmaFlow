@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Model } from 'mongoose'
-import { IExpense, ExpenseStatus, ExpenseCategory } from '@/types'
+import { IExpense, ExpenseStatus } from '@/types'
 
 // ---- INTERFACE MONGOOSE ----
 export interface IExpenseDocument extends Omit<IExpense, '_id'>, Document {}
@@ -33,21 +33,11 @@ const ExpenseSchema = new Schema<IExpenseDocument>(
       uppercase: true,
       trim: true,
     },
-    category: {
-      type: String,
-      enum: Object.values(ExpenseCategory),
-      required: [true, 'La categoría es obligatoria'],
-    },
     description: {
       type: String,
       required: [true, 'La descripción es obligatoria'],
       trim: true,
       maxlength: [500, 'La descripción no puede superar 500 caracteres'],
-    },
-    vendor: {
-      type: String,
-      trim: true,
-      maxlength: [200, 'El proveedor no puede superar 200 caracteres'],
     },
     receiptDate: {
       type: Date,
@@ -61,10 +51,38 @@ const ExpenseSchema = new Schema<IExpenseDocument>(
       type: String,
       trim: true,
     },
+    // ---- CFDI/PDF Fields (Phase 2) ----
+    pdfUrl: {
+      type: String,
+      trim: true,
+    },
+    pdfPublicId: {
+      type: String,
+      trim: true,
+    },
+    xmlUrl: {
+      type: String,
+      trim: true,
+    },
+    xmlPublicId: {
+      type: String,
+      trim: true,
+    },
+    // ---- Tracking & Modification ----
+    isModified: {
+      type: Boolean,
+      default: false,
+    },
+    period: {
+      type: String,
+      trim: true,
+      // Formato: 'YYYY-MM'
+    },
+    // ---- Status V2 ----
     status: {
       type: String,
       enum: Object.values(ExpenseStatus),
-      default: ExpenseStatus.PENDING,
+      default: ExpenseStatus.PENDIENTE_DE_FACTURAR,
       required: true,
     },
     reviewedBy: {
@@ -102,8 +120,12 @@ ExpenseSchema.index({ pharmacy: 1, createdAt: -1 })
 ExpenseSchema.index({ pharmacy: 1, status: 1 }) // Índice compuesto para métricas
 ExpenseSchema.index({ status: 1 })
 ExpenseSchema.index({ expenseNumber: 1 })
-ExpenseSchema.index({ category: 1 })
 ExpenseSchema.index({ receiptDate: -1 })
+// ---- Nuevos índices para Phase 2 ----
+ExpenseSchema.index({ period: 1 })
+ExpenseSchema.index({ pdfPublicId: 1 })
+ExpenseSchema.index({ xmlPublicId: 1 })
+ExpenseSchema.index({ isModified: 1 })
 // Compound index for common query pattern {pharmacy, status, createdAt}
 ExpenseSchema.index({ pharmacy: 1, status: 1, createdAt: -1 })
 

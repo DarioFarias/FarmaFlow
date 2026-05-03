@@ -6,9 +6,9 @@ import { useForm } from 'react-hook-form'
 import { useSession } from 'next-auth/react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createExpenseSchema, type CreateExpenseInput } from '@/lib/validations'
-import { ExpenseCategory } from '@/types'
+import { ExpenseStatus, IExpense } from '@/types'
 import { toast } from 'react-hot-toast'
-import { Loader2, ArrowLeft, Camera, Send } from 'lucide-react'
+import { Loader2, ArrowLeft, Camera, Send, FileText, File, X, FileUp, FileDigit } from 'lucide-react'
 import Link from 'next/link'
 import { compressImage } from '@/lib/image-utils'
 import { useMyPharmacies } from '@/lib/hooks/use-my-pharmacies'
@@ -18,19 +18,38 @@ interface MyPharmacy {
   pharmacyName: string
 }
 
-const CATEGORIES = [
-  { value: ExpenseCategory.UTILITIES, label: 'Luz, Agua, Gas, Internet' },
-  { value: ExpenseCategory.MAINTENANCE, label: 'Reparaciones y Mantenimiento' },
-  { value: ExpenseCategory.RENT, label: 'Alquiler / Expensas' },
-  { value: ExpenseCategory.SALARIES, label: 'Sueldos / Comisiones' },
-  { value: ExpenseCategory.TAXES, label: 'Impuestos y Tasas' },
-  { value: ExpenseCategory.OTHER, label: 'Otros Gastos' },
-]
+// Props para modo edición
+interface ExpenseFormProps {
+  expense?: IExpense
+}
 
-// Helper para verificar si es rol admin
 const isAdminRole = (role?: string) => role === 'ADMIN' || role === 'SUPER_ADMIN'
 
-export function ExpenseForm() {
+// Config de badges de estado
+const STATUS_CONFIG: Record<string, { label: string, classes: string }> = {
+  [ExpenseStatus.PENDIENTE_DE_FACTURAR]: {
+    label: 'PENDIENTE DE FACTURAR',
+    classes: 'bg-amber-50 text-amber-700 ring-amber-600/20'
+  },
+  [ExpenseStatus.FACTURADO]: {
+    label: 'FACTURADO',
+    classes: 'bg-blue-50 text-blue-700 ring-blue-600/20'
+  },
+  [ExpenseStatus.REPORTED]: {
+    label: 'REPORTED',
+    classes: 'bg-purple-50 text-purple-700 ring-purple-600/20'
+  },
+  [ExpenseStatus.PENDIENTE_DE_PAGO]: {
+    label: 'PENDIENTE DE PAGO',
+    classes: 'bg-orange-50 text-orange-700 ring-orange-600/20'
+  },
+  [ExpenseStatus.PAID]: {
+    label: 'PAID',
+    classes: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+  },
+}
+
+export function ExpenseForm({ expense }: ExpenseFormProps) {
   const router = useRouter()
   const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
@@ -38,16 +57,21 @@ export function ExpenseForm() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string>('')
 
+  // Phase 2: PDF and XML files
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [xmlFile, setXmlFile] = useState<File | null>(null)
+  const [pdfUrl, setPdfUrl] = useState<string | undefined>(expense?.pdfUrl)
+  const [xmlUrl, setXmlUrl] = useState<string | undefined>(expense?.xmlUrl)
+
   const userRole = session?.user?.role
   const isAdmin = isAdminRole(userRole)
 
-  // Use React Query hook for caching pharmacy data
+  const isEditMode = !!expense
+
+  // React Query hook for caching pharmacy data
   const { pharmacies: myPharmacies, isLoading: isLoadingPharmacies } = useMyPharmacies()
 
-  // ADMIN siempre ve el selector (aunque tenga 1 pharmacy)
-  // Otros roles ven el selector solo si tienen múltiples pharmacies
   const showPharmacySelector = isAdmin || myPharmacies.length > 1
-  const currentPharmacy = myPharmacies.find(p => p.pharmacyId === selectedPharmacyId)
 
   const {
     register,
@@ -57,7 +81,7 @@ export function ExpenseForm() {
   } = useForm<CreateExpenseInput>({
     resolver: zodResolver(createExpenseSchema),
     defaultValues: {
-      currency: 'ARS',
+      currency: 'MXN',
       receiptDate: new Date().toISOString(),
     },
   })
@@ -76,8 +100,36 @@ export function ExpenseForm() {
     }
   }
 
-  // Upload to server API which proxies to Cloudinary
-  const uploadInvoiceImage = async (file: Blob, pharmacyCode: string) => {
+  const handlePdfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.type === 'application/pdf') {
+      setPdfFile(file)
+    } else if (file) {
+      toast.error('El archivo debe ser PDF')
+    }
+  }
+
+  const removePdf = () => {
+    setPdfFile(null)
+    setPdfUrl(undefined)
+  }
+
+  const handleXmlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && (file.type === 'text/xml' || file.name.endsWith('.xml'))) {
+      setXmlFile(file)
+    } else if (file) {
+      toast.error('El archivo debe ser XML')
+    }
+  }
+
+  const removeXml = () => {
+    setXmlFile(null)
+    setXmlUrl(undefined)
+  }
+
+  // Upload ANY file (image, PDF, XML) through the server-side Cloudinary proxy
+  const uploadFile = async (file: Blob, pharmacyCode: string) => {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('pharmacyCode', pharmacyCode)
@@ -89,18 +141,17 @@ export function ExpenseForm() {
 
     if (!response.ok) {
       const errorData = await response.json()
-      throw new Error(errorData.error || 'Error al subir la imagen')
+      throw new Error(errorData.error || 'Error al subir archivo')
     }
     return response.json()
   }
 
   const onSubmit = async (data: CreateExpenseInput) => {
-    if (!selectedFile) {
-      toast.error('Debes subir una foto de la factura o ticket')
+    if (!isEditMode && !selectedFile && !pdfFile) {
+      toast.error('Debes subir una foto o archivo PDF de la factura')
       return
     }
 
-    // Determine pharmacy code for upload
     const uploadPharmacyCode = selectedPharmacyId || myPharmacies[0]?.pharmacyId
     if (!uploadPharmacyCode) {
       toast.error('Debes seleccionar una farmacia')
@@ -109,24 +160,53 @@ export function ExpenseForm() {
 
     setIsLoading(true)
     try {
-      // 1. Comprimir imagen
-      toast.loading('Comprimiendo imagen...', { id: 'expense-load' })
-      const compressedBlob = await compressImage(selectedFile, 1000, 0.6)
+      let invoiceImageUrl: string | undefined
+      let invoicePublicId: string | undefined
+      let pdfUrlValue: string | undefined
+      let pdfPublicId: string | undefined
+      let xmlUrlValue: string | undefined
+      let xmlPublicId: string | undefined
 
-      // 2. Subir al servidor (que proxya a Cloudinary)
-      toast.loading('Subiendo comprobante...', { id: 'expense-load' })
-      const cloudData = await uploadInvoiceImage(compressedBlob, uploadPharmacyCode)
+      // Subir imagen original via server proxy
+      if (selectedFile) {
+        toast.loading('Comprimiendo imagen...', { id: 'expense-load' })
+        const compressedBlob = await compressImage(selectedFile, 1000, 0.6)
 
-      // 3. Guardar en la API
+        toast.loading('Subiendo comprobante...', { id: 'expense-load' })
+        const cloudData = await uploadFile(compressedBlob, uploadPharmacyCode)
+        invoiceImageUrl = cloudData.url
+        invoicePublicId = cloudData.publicId
+      }
+
+      // Subir PDF
+      if (pdfFile) {
+        toast.loading('Subiendo PDF...', { id: 'expense-load' })
+        const pdfData = await uploadFile(pdfFile, uploadPharmacyCode)
+        pdfUrlValue = pdfData.url
+        pdfPublicId = pdfData.publicId
+      }
+
+      // Subir XML
+      if (xmlFile) {
+        toast.loading('Subiendo XML...', { id: 'expense-load' })
+        const xmlData = await uploadFile(xmlFile, uploadPharmacyCode)
+        xmlUrlValue = xmlData.url
+        xmlPublicId = xmlData.publicId
+      }
+
+      // Guardar en la API
       toast.loading('Guardando registro...', { id: 'expense-load' })
       const response = await fetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...data,
-          invoiceImageUrl: cloudData.url,
-          invoicePublicId: cloudData.publicId,
-          // Incluir pharmacyId si el usuario tiene farmacias asignadas
+          invoiceImageUrl,
+          invoicePublicId,
+          pdfUrl: pdfUrlValue,
+          pdfPublicId,
+          xmlUrl: xmlUrlValue,
+          xmlPublicId,
           ...(myPharmacies.length > 0 && selectedPharmacyId
             ? { pharmacyId: selectedPharmacyId }
             : {}),
@@ -145,10 +225,12 @@ export function ExpenseForm() {
     }
   }
 
+  const statusInfo = expense ? STATUS_CONFIG[expense.status] : null
+
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <Link 
+        <Link
           href="/dashboard/gastos"
           className="inline-flex items-center text-sm text-gray-500 hover:text-brand-600 transition-colors"
         >
@@ -156,6 +238,14 @@ export function ExpenseForm() {
           Volver a mis gastos
         </Link>
       </div>
+
+      {isEditMode && statusInfo && (
+        <div className="mb-4">
+          <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold ring-1 ring-inset ${statusInfo.classes}`}>
+            {statusInfo.label}
+          </span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
@@ -171,30 +261,21 @@ export function ExpenseForm() {
                     {...register('amount', { valueAsNumber: true })}
                     className="input pl-8 text-lg font-bold text-brand-600"
                     placeholder="0.00"
+                    disabled={isEditMode}
                   />
                 </div>
                 {errors.amount && <p className="text-xs text-red-500">{errors.amount.message}</p>}
               </div>
 
-              {/* Selector de Farmacia - mostrar para ADMIN o si tiene 2+ */}
               {showPharmacySelector && myPharmacies.length > 0 && (
                 <div className="space-y-2">
-                  <label className="label">
-                    {isLoadingPharmacies ? (
-                      <span className="flex items-center gap-1">
-                        <Loader2 size={14} className="animate-spin" />
-                        Cargando farmacias...
-                      </span>
-                    ) : (
-                      'Farmacia'
-                    )}
-                  </label>
+                  <label className="label">Farmacia</label>
                   <select
                     value={selectedPharmacyId}
                     onChange={(e) => setSelectedPharmacyId(e.target.value)}
                     className="input"
                     required={isAdmin}
-                    disabled={isLoadingPharmacies}
+                    disabled={isEditMode || isLoadingPharmacies}
                   >
                     <option value="">Seleccionar farmacia...</option>
                     {myPharmacies.map(p => (
@@ -203,18 +284,8 @@ export function ExpenseForm() {
                       </option>
                     ))}
                   </select>
-                  {errors.category && <p className="text-xs text-red-500">{errors.category.message}</p>}
                 </div>
               )}
-
-              <div className="space-y-2">
-                <label className="label">Categoría</label>
-                <select {...register('category')} className="input">
-                  {CATEGORIES.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
 
               <div className="col-span-full space-y-2">
                 <label className="label">Descripción / Motivo</label>
@@ -223,13 +294,9 @@ export function ExpenseForm() {
                   rows={3}
                   className="input resize-none"
                   placeholder="Ej: Pago de factura Edesur del mes de Mayo"
+                  disabled={isEditMode && expense?.status !== ExpenseStatus.PENDIENTE_DE_FACTURAR}
                 />
                 {errors.description && <p className="text-xs text-red-500">{errors.description.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <label className="label">Proveedor / Comercio</label>
-                <input {...register('vendor')} className="input" placeholder="Ej: Edesur, Carrefour, etc." />
               </div>
 
               <div className="space-y-2">
@@ -241,8 +308,21 @@ export function ExpenseForm() {
                     setValue('receiptDate', date.toISOString())
                   }}
                   className="input"
+                  disabled={isEditMode}
                 />
               </div>
+
+              {isEditMode && (
+                <div className="col-span-full space-y-2">
+                  <label className="label">Notas (opcional)</label>
+                  <textarea
+                    {...register('notes' as any)}
+                    rows={2}
+                    className="input resize-none"
+                    placeholder="Agregar notas para la transición de estado..."
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -274,6 +354,62 @@ export function ExpenseForm() {
             </div>
           </div>
 
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Archivo PDF (CFDI)</h3>
+            {(pdfUrl || pdfFile) ? (
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <FileText size={20} className="text-blue-600" />
+                  <span className="text-sm text-blue-700 truncate max-w-[150px]">
+                    {pdfFile?.name || 'factura.pdf'}
+                  </span>
+                </div>
+                <button type="button" onClick={removePdf} className="p-1 hover:bg-blue-100 rounded">
+                  <X size={16} className="text-blue-600" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center overflow-hidden group hover:border-brand-300 transition-colors">
+                <label className="cursor-pointer flex flex-col items-center gap-2 p-4 text-center">
+                  <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <FileUp size={20} />
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">Subir PDF</span>
+                  <span className="text-xs text-gray-400">Archivo .pdf</span>
+                  <input type="file" accept=".pdf,application/pdf" className="hidden" onChange={handlePdfChange} data-testid="pdf-upload" />
+                </label>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Archivo XML (CFDI)</h3>
+            {(xmlUrl || xmlFile) ? (
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <FileDigit size={20} className="text-purple-600" />
+                  <span className="text-sm text-purple-700 truncate max-w-[150px]">
+                    {xmlFile?.name || 'factura.xml'}
+                  </span>
+                </div>
+                <button type="button" onClick={removeXml} className="p-1 hover:bg-purple-100 rounded">
+                  <X size={16} className="text-purple-600" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center overflow-hidden group hover:border-brand-300 transition-colors">
+                <label className="cursor-pointer flex flex-col items-center gap-2 p-4 text-center">
+                  <div className="h-10 w-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
+                    <File size={20} />
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900">Subir XML</span>
+                  <span className="text-xs text-gray-400">Archivo .xml</span>
+                  <input type="file" accept=".xml,text/xml,application/xml" className="hidden" onChange={handleXmlChange} data-testid="xml-upload" />
+                </label>
+              </div>
+            )}
+          </div>
+
           <button
             type="submit"
             disabled={isLoading}
@@ -284,7 +420,7 @@ export function ExpenseForm() {
             ) : (
               <>
                 <Send size={20} />
-                Rendir Gasto
+                {isEditMode ? 'Actualizar Gasto' : 'Rendir Gasto'}
               </>
             )}
           </button>

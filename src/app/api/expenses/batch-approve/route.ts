@@ -3,121 +3,105 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
-import { UserRole, ExpenseStatus } from '@/types'
+import { batchIdsSchema } from '@/lib/validations'
+import { UserRole, ApiResponse, ExpenseStatus } from '@/types'
+import { isAdmin } from '@/lib/roles'
 
 // =============================================
-// API Route: /api/expenses/batch-approve
-// Bulk approve multiple pending expenses
+// POST /api/expenses/batch-approve
+// Approve multiple expenses: PENDIENTE_DE_FACTURAR → FACTURADO
+// or FACTURADO → REPORTED
 // =============================================
 
-export async function PATCH(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    if (!session?.user) {
+      return NextResponse.json<ApiResponse>({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
-    // Only ADMIN, SUPER_ADMIN, and SUPERVISOR can batch approve
     const userRole = session.user.role as UserRole
-    if (userRole !== UserRole.ADMIN && userRole !== UserRole.SUPER_ADMIN && userRole !== UserRole.SUPERVISOR) {
-      return NextResponse.json({ error: 'No tienes permisos para aprobar gastos' }, { status: 403 })
+    
+    if (!isAdmin(userRole)) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: 'Solo el supervisor puede aprobar gastos en lote' },
+        { status: 403 }
+      )
     }
 
     const body = await req.json()
-    const { expenseIds } = body
+    const validation = batchIdsSchema.safeParse(body)
 
-    // Validate expenseIds
-    if (!expenseIds || !Array.isArray(expenseIds) || expenseIds.length === 0) {
-      return NextResponse.json(
-        { error: 'Se requiere un array de expenseIds' },
+    if (!validation.success) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: validation.error.errors[0]?.message },
         { status: 400 }
       )
     }
 
     await connectDB()
 
-    // Find all expenses by IDs
-    const expenses = await Expense.find({
-      _id: { $in: expenseIds }
-    })
+    const { expenseIds, notes } = validation.data
+    const results: { id: string; success: boolean; error?: string }[] = []
+    const currentYear = new Date().getFullYear()
+    const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0')
+    const period = `${currentYear}-${currentMonth}`
 
-    // Check for invalid IDs
-    const foundIds = expenses.map(e => e._id.toString())
-    const notFoundIds = expenseIds.filter((id: string) => !foundIds.includes(id))
+    for (const id of expenseIds) {
+      try {
+        const expense = await Expense.findById(id)
 
-    // Validate: only PENDING expenses can be approved
-    const validExpenses: typeof expenses = []
-    const invalidStatusIds: string[] = []
-
-    for (const expense of expenses) {
-      if (expense.status === ExpenseStatus.PENDING) {
-        validExpenses.push(expense)
-      } else {
-        invalidStatusIds.push(expense._id.toString())
-      }
-    }
-
-    // Perform bulk update for valid expenses
-    const processedResults: { id: string, status: string }[] = []
-    let modifiedCount = 0
-
-    if (validExpenses.length > 0) {
-      const validIds = validExpenses.map(e => e._id)
-      
-      const result = await Expense.bulkWrite([
-        {
-          updateMany: {
-            filter: { _id: { $in: validIds } },
-            update: {
-              $set: {
-                status: ExpenseStatus.APPROVED,
-                reviewedBy: session.user.id,
-                reviewedAt: new Date()
-              }
-            }
-          }
+        if (!expense) {
+          results.push({ id, success: false, error: 'No encontrado' })
+          continue
         }
-      ])
 
-      modifiedCount = result.modifiedCount
+        const currentStatus = expense.status as ExpenseStatus
+        
+        if (currentStatus === ExpenseStatus.PENDIENTE_DE_FACTURAR) {
+          if (!expense.pdfUrl || !expense.xmlUrl) {
+            results.push({ id, success: false, error: 'Falta pdfUrl o xmlUrl' })
+            continue
+          }
 
-      // Build processed results
-      for (const expense of validExpenses) {
-        processedResults.push({
-          id: expense._id.toString(),
-          status: ExpenseStatus.APPROVED
-        })
+          await Expense.findByIdAndUpdate(id, {
+            status: ExpenseStatus.FACTURADO,
+            adminComment: notes,
+            reviewedBy: session.user.id,
+            reviewedAt: new Date(),
+          })
+          results.push({ id, success: true })
+        } else if (currentStatus === ExpenseStatus.FACTURADO) {
+          await Expense.findByIdAndUpdate(id, {
+            status: ExpenseStatus.REPORTED,
+            period: period,
+            adminComment: notes,
+            reviewedBy: session.user.id,
+            reviewedAt: new Date(),
+          })
+          results.push({ id, success: true })
+        } else {
+          results.push({ id, success: false, error: `Estado inválido: ${currentStatus}` })
+        }
+      } catch (err) {
+        results.push({ id, success: false, error: 'Error al procesar' })
       }
     }
 
-    // Build partial errors for invalid IDs
-    const partialErrors: { id: string, reason: string }[] = []
-    
-    for (const id of notFoundIds) {
-      partialErrors.push({
-        id,
-        reason: 'Gasto no encontrado'
-      })
-    }
-    
-    for (const id of invalidStatusIds) {
-      partialErrors.push({
-        id,
-        reason: `El gasto no está en estado PENDING (estado actual: ${expenses.find(e => e._id.toString() === id)?.status || 'desconocido'})`
-      })
-    }
+    const processed = results.filter(r => r.success).length
+    const failed = results.filter(r => !r.success).length
 
-    return NextResponse.json({
+    return NextResponse.json<ApiResponse>({
       success: true,
-      processedResults,
-      modifiedCount,
-      partialErrors: partialErrors.length > 0 ? partialErrors : undefined
+      data: {
+        processed,
+        failed,
+        total: expenseIds.length,
+        results,
+      },
     })
   } catch (error) {
-    console.error('API_BATCH_APPROVE_ERROR:', error)
-    return NextResponse.json(
-      { error: 'Error al aprobar gastos en lote' },
-      { status: 500 }
-    )
+    console.error('[POST /api/expenses/batch-approve]', error)
+    return NextResponse.json<ApiResponse>({ success: false, error: 'Error interno' }, { status: 500 })
   }
 }

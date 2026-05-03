@@ -36,13 +36,22 @@ export enum SupplyCategory {
   OTHER = 'OTROS',                  // Otros
 }
 
-// ---- ESTADOS DE REPORTE DE GASTOS ----
+// ---- ESTADOS DE REPORTE DE GASTOS V2 ----
 
 export enum ExpenseStatus {
-  PENDING   = 'PENDING',    // Subido por farmacia, pendiente de revisión
-  REVIEWED  = 'REVIEWED',   // Supervisor revisó
-  APPROVED  = 'APPROVED',   // Gasto aprobado/auditado
-  DISPUTED  = 'DISPUTED',   // Gasto en disputa / requiere aclaración
+  PENDIENTE_DE_FACTURAR = 'PENDIENTE_DE_FACTURAR',  // Pendiente de generar factura
+  FACTURADO            = 'FACTURADO',               // Factura generada
+  REPORTED             = 'REPORTED',                // Reportado en CFDI
+  PENDIENTE_DE_PAGO    = 'PENDIENTE_DE_PAGO',      // Pendiente de pago
+  PAID                 = 'PAID',                   // Pagado
+}
+
+// @deprecated - Estados removidos en V2. Migración completada.
+export enum ExpenseStatusLegacy {
+  PENDING   = 'PENDING',
+  REVIEWED  = 'REVIEWED',
+  APPROVED  = 'APPROVED',
+  DISPUTED  = 'DISPUTED',
 }
 
 // ---- CATEGORÍAS DE GASTOS ----
@@ -59,6 +68,16 @@ export enum ExpenseCategory {
 // =============================================
 // INTERFACES DE DOMINIO
 // =============================================
+
+// ---- PERIODO (Formato YYYY-MM para reportes) ----
+
+export type Period = string // Formato: '2024-01', '2024-12', etc.
+
+export interface IPeriodReference {
+  period: Period       // Formato YYYY-MM
+  year: number         // Año: 2024
+  month: number        // Mes: 1-12
+}
 
 // ---- FARMACIA (Entidad independiente del usuario) ----
 
@@ -138,7 +157,7 @@ export interface ISupplyRequest {
   updatedAt: Date
 }
 
-// ---- REPORTE DE GASTO ----
+// ---- REPORTE DE GASTO V2 ----
 
 export interface IExpense {
   _id: string
@@ -147,16 +166,26 @@ export interface IExpense {
   pharmacyName: string      // Denormalizado
   amount: number            // Monto en moneda local
   currency: string          // 'MXN', 'USD', etc.
-  category: ExpenseCategory
   description: string       // Descripción del gasto
-  vendor?: string           // Proveedor / local donde se realizó
   receiptDate: Date         // Fecha de la factura/ticket
   invoiceImageUrl?: string  // URL de Cloudinary con la foto de la factura
   invoicePublicId?: string  // Public ID en Cloudinary (para eliminación)
-  status: ExpenseStatus
+  
+  // CFDI/PDF Fields - Phase 2
+  pdfUrl?: string           // URL del PDF de la factura
+  pdfPublicId?: string     // Public ID del PDF en Cloudinary
+  xmlUrl?: string          // URL del XML del CFDI
+  xmlPublicId?: string     // Public ID del XML en Cloudinary
+  
+  // Tracking & Modification
+  isModified?: boolean      // Si el gasto fue modificado después de aprobado
+  period?: Period           // Periodo contable (YYYY-MM)
+  
+status: ExpenseStatus
   reviewedBy?: string       // User ID del supervisor que revisó
   reviewedAt?: Date
   adminComment?: string     // Comentario del supervisor
+   
   createdAt: Date
   updatedAt: Date
 }
@@ -202,13 +231,18 @@ export type CreateExpenseDTO = Pick<
   IExpense,
   | 'amount'
   | 'currency'
-  | 'category'
   | 'description'
-  | 'vendor'
   | 'receiptDate'
   | 'invoiceImageUrl'
   | 'invoicePublicId'
->
+> & {
+  // Phase 2 fields
+  pdfUrl?: string
+  pdfPublicId?: string
+  xmlUrl?: string
+  xmlPublicId?: string
+  period?: string
+}
 
 export type UpdateExpenseStatusDTO = {
   status: ExpenseStatus

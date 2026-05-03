@@ -3,119 +3,86 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
-import { UserRole, ExpenseStatus } from '@/types'
+import { batchIdsSchema } from '@/lib/validations'
+import { UserRole, ApiResponse, ExpenseStatus } from '@/types'
+import { isAdmin } from '@/lib/roles'
 
 // =============================================
-// API Route: /api/expenses/batch-return
-// Bulk return expenses to pending status (for disputes/revisions)
+// POST /api/expenses/batch-return
+// Return multiple REPORTED expenses to PENDIENTE_DE_PAGO
+// For payment processing
 // =============================================
 
-export async function PATCH(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    if (!session?.user) {
+      return NextResponse.json<ApiResponse>({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
-    // Only ADMIN, SUPER_ADMIN, and SUPERVISOR can batch return
     const userRole = session.user.role as UserRole
-    if (userRole !== UserRole.ADMIN && userRole !== UserRole.SUPER_ADMIN && userRole !== UserRole.SUPERVISOR) {
-      return NextResponse.json({ error: 'No tienes permisos para devolver gastos' }, { status: 403 })
+    
+    if (!isAdmin(userRole)) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: 'Solo el supervisor puede devolver gastos en lote' },
+        { status: 403 }
+      )
     }
 
     const body = await req.json()
-    const { expenseIds } = body
+    const validation = batchIdsSchema.safeParse(body)
 
-    // Validate expenseIds
-    if (!expenseIds || !Array.isArray(expenseIds) || expenseIds.length === 0) {
-      return NextResponse.json(
-        { error: 'Se requiere un array de expenseIds' },
+    if (!validation.success) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: validation.error.errors[0]?.message },
         { status: 400 }
       )
     }
 
     await connectDB()
 
-    // Find all expenses by IDs
-    const expenses = await Expense.find({
-      _id: { $in: expenseIds }
-    })
+    const { expenseIds, notes } = validation.data
+    const results: { id: string; success: boolean; error?: string }[] = []
 
-    // Check for invalid IDs
-    const foundIds = expenses.map(e => e._id.toString())
-    const notFoundIds = expenseIds.filter((id: string) => !foundIds.includes(id))
-
-    // Validate: only APPROVED or REVIEWED expenses can be returned to PENDING
-    const validExpenses: typeof expenses = []
-    const invalidStatusIds: string[] = []
-
-    for (const expense of expenses) {
-      if (expense.status === ExpenseStatus.APPROVED || expense.status === ExpenseStatus.REVIEWED) {
-        validExpenses.push(expense)
-      } else {
-        invalidStatusIds.push(expense._id.toString())
-      }
-    }
-
-    // Perform bulk update for valid expenses
-    const processedResults: { id: string, status: string }[] = []
-    let modifiedCount = 0
-
-    if (validExpenses.length > 0) {
-      const validIds = validExpenses.map(e => e._id)
+    for (const id of expenseIds) {
+      const expense = await Expense.findById(id)
       
-      const result = await Expense.bulkWrite([
-        {
-          updateMany: {
-            filter: { _id: { $in: validIds } },
-            update: {
-              $set: { status: ExpenseStatus.PENDING },
-              $unset: { reviewedBy: "", reviewedAt: "" }
-            }
-          }
-        }
-      ])
-
-      modifiedCount = result.modifiedCount
-
-      // Build processed results
-      for (const expense of validExpenses) {
-        processedResults.push({
-          id: expense._id.toString(),
-          status: ExpenseStatus.PENDING
-        })
+      if (!expense) {
+        results.push({ id, success: false, error: 'No encontrado' })
+        continue
       }
+
+      if (expense.status !== ExpenseStatus.REPORTED) {
+        results.push({ id, success: false, error: `Debe estar REPORTADO, estado actual: ${expense.status}` })
+        continue
+      }
+
+      await Expense.findByIdAndUpdate(
+        id,
+        {
+          status: ExpenseStatus.PENDIENTE_DE_PAGO,
+          adminComment: notes || 'Devuelto para pago',
+          reviewedBy: session.user.id,
+          reviewedAt: new Date(),
+        }
+      )
+      results.push({ id, success: true })
     }
 
-    // Build partial errors for invalid IDs
-    const partialErrors: { id: string, reason: string }[] = []
-    
-    for (const id of notFoundIds) {
-      partialErrors.push({
-        id,
-        reason: 'Gasto no encontrado'
-      })
-    }
-    
-    for (const id of invalidStatusIds) {
-      const expense = expenses.find(e => e._id.toString() === id)
-      partialErrors.push({
-        id,
-        reason: `El gasto no puede ser devuelto (estado actual: ${expense?.status || 'desconocido'})`
-      })
-    }
+    const processed = results.filter(r => r.success).length
+    const failed = results.filter(r => !r.success).length
 
-    return NextResponse.json({
+    return NextResponse.json<ApiResponse>({
       success: true,
-      processedResults,
-      modifiedCount,
-      partialErrors: partialErrors.length > 0 ? partialErrors : undefined
+      data: {
+        processed,
+        failed,
+        total: expenseIds.length,
+        results,
+      },
     })
   } catch (error) {
-    console.error('API_BATCH_RETURN_ERROR:', error)
-    return NextResponse.json(
-      { error: 'Error al devolver gastos' },
-      { status: 500 }
-    )
+    console.error('[POST /api/expenses/batch-return]', error)
+    return NextResponse.json<ApiResponse>({ success: false, error: 'Error interno' }, { status: 500 })
   }
 }

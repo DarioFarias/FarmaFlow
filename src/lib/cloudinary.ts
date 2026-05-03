@@ -14,13 +14,27 @@ cloudinary.config({
 
 export default cloudinary
 
-// ---- Función helper: subir imagen desde base64 o URL ----
+// ---- Función helper: subir archivo a Cloudinary ----
+// Soporta imágenes (jpg, png, webp), PDFs (resource_type: 'image') y archivos raw (xml, etc.)
 export async function uploadInvoiceImage(
   fileData: string,
-  pharmacyCode: string
+  pharmacyCode: string,
+  mimeType?: string
 ): Promise<{ url: string; publicId: string }> {
+  const isRaw = mimeType ? !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(mimeType) : false
+  const folder = `farmaflow/expenses/${pharmacyCode}`
+
+  if (isRaw) {
+    const result = await cloudinary.uploader.upload(fileData, {
+      folder,
+      resource_type: 'raw',
+      tags: ['farmaflow', 'expense', pharmacyCode, 'raw'],
+    })
+    return { url: result.secure_url, publicId: result.public_id }
+  }
+
   const result = await cloudinary.uploader.upload(fileData, {
-    folder: `farmaflow/expenses/${pharmacyCode}`,
+    folder,
     resource_type: 'image',
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'pdf'],
     transformation: [{ quality: 'auto', fetch_format: 'auto' }],

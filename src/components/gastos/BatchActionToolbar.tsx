@@ -1,0 +1,108 @@
+'use client'
+
+import { useState } from 'react'
+import { Check, X, FileCheck, Send, RotateCcw, Loader2 } from 'lucide-react'
+import { toast } from 'react-hot-toast'
+
+interface BatchActionToolbarProps {
+  selectedIds: string[]
+  currentFilter?: string
+  onClear: () => void
+}
+
+type BatchAction = 'validate' | 'report' | 'return'
+
+export function BatchActionToolbar({ 
+  selectedIds, 
+  currentFilter,
+  onClear 
+}: BatchActionToolbarProps) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [action, setAction] = useState<BatchAction | null>(null)
+
+  // Determinar acción basada en el filter actual (orden específico)
+  const getAction = (): BatchAction | null => {
+    if (!currentFilter) return 'validate' // Default
+    // ORDEN ESPECÍFICO: primero el más específico
+    if (currentFilter === 'REPORTED') return 'return'
+    if (currentFilter === 'FACTURADO') return 'report'  // Segunda etapa
+    if (currentFilter === 'PENDIENTE_DE_FACTURAR') return 'validate'
+    if (currentFilter === 'PENDIENTE_DE_PAGO') return 'validate'
+    return 'validate'
+  }
+
+  const currentAction = action || getAction()
+
+  const getActionLabel = () => {
+    if (currentAction === 'validate') return 'Validar'
+    if (currentAction === 'report') return 'Reportar a Contabilidad'
+    if (currentAction === 'return') return 'Devolver a Farmacia'
+    return 'Aprobar'
+  }
+
+  const getActionIcon = () => {
+    if (currentAction === 'validate') return <FileCheck size={18} />
+    if (currentAction === 'report') return <Send size={18} />
+    return <RotateCcw size={18} />
+  }
+
+  const handleBatchAction = async () => {
+    if (!selectedIds.length || !currentAction) return
+
+    setIsLoading(true)
+    try {
+      let endpoint = '/api/expenses/batch-approve'
+      if (currentAction === 'report') endpoint = '/api/expenses/batch-report'
+      if (currentAction === 'return') endpoint = '/api/expenses/batch-return'
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expenseIds: selectedIds }),
+      })
+
+      if (!res.ok) throw new Error('Error en operación batch')
+
+      toast.success(`${selectedIds.length} gasto(s) actualizado(s)`)
+      onClear()
+    } catch (error) {
+      toast.error('Error al procesar operación')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (selectedIds.length === 0) return null
+
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 flex items-center gap-4 z-50">
+      <span className="text-sm font-medium text-gray-700">
+        {selectedIds.length} seleccionados
+      </span>
+
+      <div className="h-6 w-px bg-gray-200" />
+
+      <button
+        onClick={handleBatchAction}
+        disabled={isLoading}
+        className="btn-primary flex items-center gap-2"
+      >
+        {isLoading ? (
+          <Loader2 size={18} className="animate-spin" />
+        ) : (
+          getActionIcon()
+        )}
+        {getActionLabel()}
+      </button>
+
+      <div className="h-6 w-px bg-gray-200" />
+
+      <button
+        onClick={onClear}
+        className="p-2 hover:bg-gray-100 rounded-lg"
+      >
+        <X size={18} />
+      </button>
+    </div>
+  )
+}

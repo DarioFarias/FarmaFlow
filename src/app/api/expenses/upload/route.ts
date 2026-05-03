@@ -5,8 +5,8 @@ import { uploadInvoiceImage } from '@/lib/cloudinary'
 
 // =============================================
 // API Route: /api/expenses/upload
-// Maneja la subida de imágenes de comprobantes de gastos
-// Usa el SDK de Cloudinary del lado del servidor
+// Maneja la subida de archivos de comprobantes de gastos
+// (imágenes, PDFs, XMLs) usando SDK de Cloudinary server-side
 // =============================================
 
 export async function POST(req: NextRequest) {
@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(arrayBuffer)
     const base64Data = `data:${file.type || 'image/jpeg'};base64,${buffer.toString('base64')}`
 
-    // Llamar a uploadInvoiceImage del servidor
-    const result = await uploadInvoiceImage(base64Data, pharmacyCode)
+    // Llamar a uploadInvoiceImage del servidor con el tipo MIME para elegir resource_type
+    const result = await uploadInvoiceImage(base64Data, pharmacyCode, file.type)
 
     // 1.4 Retornar respuesta exitosa
     return NextResponse.json({

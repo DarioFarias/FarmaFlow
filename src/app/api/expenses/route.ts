@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
-import { createExpenseSchema, paginationParams } from '@/lib/validations'
+import { createExpenseSchema, paginationParams, expenseFilterParams } from '@/lib/validations'
 import { UserRole, ExpenseStatus } from '@/types'
 import { TTLCache } from '@/lib/ttl-cache'
 
@@ -21,6 +21,46 @@ function getPharmacyCacheKey(pharmacyIds: string[]): string {
 // API Route: /api/expenses
 // Maneja la creación y listado de rendición de gastos
 // =============================================
+
+// Helper: build query filters from params
+function buildExpenseFilter(filters: {
+  status?: string
+  period?: string
+  startDate?: string
+  endDate?: string
+  pharmacyId?: string
+}) {
+  const query: any = {}
+
+  // Status filter (supports CSV: 'PENDIENTE_DE_FACTURAR,FACTURADO')
+  if (filters.status) {
+    const statuses = filters.status.split(',').map((s) => s.trim())
+    query.status = { $in: statuses }
+  }
+
+  // Period filter
+  if (filters.period) {
+    query.period = filters.period
+  }
+
+  // Date range filter
+  if (filters.startDate || filters.endDate) {
+    query.receiptDate = {}
+    if (filters.startDate) {
+      query.receiptDate.$gte = new Date(filters.startDate)
+    }
+    if (filters.endDate) {
+      query.receiptDate.$lte = new Date(filters.endDate)
+    }
+  }
+
+  // Pharmacy filter
+  if (filters.pharmacyId) {
+    query.pharmacy = filters.pharmacyId
+  }
+
+  return query
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -114,11 +154,27 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // =============================================
+    // Phase 2: Determine initial status based on invoice presence
+    // FACTURADO: requires both pdfUrl AND xmlUrl
+    // PENDIENTE_DE_FACTURAR: no invoice OR partial invoice
+    // =============================================
+    const { pdfUrl, xmlUrl } = validation.data as {
+      pdfUrl?: string
+      xmlPublicId?: string
+      xmlUrl?: string
+    }
+
+    const hasFullInvoice = pdfUrl && xmlUrl
+    const initialStatus = hasFullInvoice
+      ? ExpenseStatus.FACTURADO
+      : ExpenseStatus.PENDIENTE_DE_FACTURAR
+
     const newExpense = await Expense.create({
       ...validation.data,
       pharmacy: finalPharmacyId,
       pharmacyName: pharmacyName,
-      status: ExpenseStatus.PENDING,
+      status: initialStatus,
     })
 
     return NextResponse.json(newExpense, { status: 201 })
@@ -140,7 +196,7 @@ export async function GET(req: NextRequest) {
 
     await connectDB()
 
-    // Sanitizar y validar parámetros de paginación
+    // Parse pagination params
     const { searchParams } = new URL(req.url)
     const pagination = paginationParams.safeParse({
       page: searchParams.get('page') || '1',
@@ -148,7 +204,19 @@ export async function GET(req: NextRequest) {
     })
     const { page, pageSize } = pagination.success ? pagination.data : { page: 1, pageSize: 20 }
 
-    let query = {}
+    // Parse filter params
+    const filterResult = expenseFilterParams.safeParse({
+      status: searchParams.get('status'),
+      period: searchParams.get('period'),
+      startDate: searchParams.get('startDate'),
+      endDate: searchParams.get('endDate'),
+      pharmacyId: searchParams.get('pharmacyId'),
+      sortBy: searchParams.get('sortBy'),
+      sortOrder: searchParams.get('sortOrder'),
+    })
+    const filters = filterResult.success ? filterResult.data : undefined
+
+    let query: Record<string, unknown> = {}
     const userRole = session.user.role as UserRole
     const userId = session.user.id
 
@@ -181,14 +249,26 @@ export async function GET(req: NextRequest) {
     }
     // ADMIN y SUPER_ADMIN ven todos los gastos
 
-    // Ejecutar query con paginación
+    // Apply additional filters from query params
+    const additionalFilters = filters ? buildExpenseFilter(filters) : {}
+    query = { ...query, ...additionalFilters }
+
+    // Build sort options
+    const sortOptions: Record<string, 1 | -1> = {}
+    if (filters?.sortBy) {
+      sortOptions[filters.sortBy] = filters.sortOrder === 'asc' ? 1 : -1
+    } else {
+      sortOptions.createdAt = -1 // default
+    }
+
+    // Execute query with pagination
     const skip = (page - 1) * pageSize
     const [expenses, total] = await Promise.all([
       Expense.find(query)
-        .sort({ createdAt: -1 })
+        .sort(sortOptions)
         .skip(skip)
         .limit(pageSize)
-        .select('expenseNumber pharmacy pharmacyName amount currency category description vendor receiptDate status createdAt'),
+        .select('expenseNumber pharmacy pharmacyName amount currency category description vendor receiptDate status createdAt period pdfUrl xmlUrl'),
       Expense.countDocuments(query),
     ])
 
@@ -200,6 +280,10 @@ export async function GET(req: NextRequest) {
       page,
       limit: pageSize,
       totalPages,
+      // Include filters applied for transparency
+      filters: filters && (filters.status || filters.period || filters.startDate || filters.endDate)
+        ? { status: filters.status, period: filters.period, dateRange: filters.startDate && filters.endDate ? { startDate: filters.startDate, endDate: filters.endDate } : undefined }
+        : undefined,
     })
   } catch (error) {
     console.error('API_EXPENSES_GET_ERROR:', error)

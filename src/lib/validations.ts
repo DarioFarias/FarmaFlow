@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import {
   SupplyCategory,
-  ExpenseCategory,
   SupplyRequestStatus,
   ExpenseStatus,
 } from '@/types'
@@ -260,16 +259,42 @@ export const updateSupplyStatusSchema = z.object({
 
 // ---- GASTOS ----
 
+// Schema para crear gasto - Phase 2
+// Category y vendor removidos en V2
 export const createExpenseSchema = z.object({
   amount: z.number().positive('El monto debe ser positivo'),
-  currency: z.string().default('ARS'),
-  category: z.nativeEnum(ExpenseCategory),
+  currency: z.string().default('MXN'),
   description: z.string().min(1).max(500).trim(),
-  vendor: z.string().max(200).optional(),
   receiptDate: z.string().datetime(),
   invoiceImageUrl: z.string().url().optional(),
   invoicePublicId: z.string().optional(),
-  pharmacyId: z.string().optional(), // ID de farmacia para asignar el gasto
+  // ---- Fase 2: CFDI Invoice Fields ----
+  pdfUrl: z.string().url().optional(),
+  pdfPublicId: z.string().optional(),
+  xmlUrl: z.string().url().optional(),
+  xmlPublicId: z.string().optional(),
+  // ---- Optional Pharmacy ----
+  pharmacyId: z.string().optional(),
+  // ---- Period (for manual grouping) ----
+  period: z.string().regex(/^\d{4}-\d{2}$/, 'Formato: YYYY-MM').optional(),
+})
+
+// Schema para actualizar gasto - Phase 2
+// Permite edición de campos incluyendo los nuevos de CFDI
+export const updateExpenseSchema = z.object({
+  amount: z.number().positive().optional(),
+  currency: z.string().optional(),
+  description: z.string().min(1).max(500).trim().optional(),
+  receiptDate: z.string().datetime().optional(),
+  invoiceImageUrl: z.string().url().optional(),
+  invoicePublicId: z.string().optional(),
+  // ---- Phase 2: CFDI Invoice Fields ----
+  pdfUrl: z.string().url().optional(),
+  pdfPublicId: z.string().optional(),
+  xmlUrl: z.string().url().optional(),
+  xmlPublicId: z.string().optional(),
+  // ---- Period ----
+  period: z.string().regex(/^\d{4}-\d{2}$/, 'Formato: YYYY-MM').optional(),
 })
 
 export const updateExpenseStatusSchema = z.object({
@@ -296,4 +321,39 @@ export type AdminChangePasswordInput = z.infer<typeof adminChangePasswordSchema>
 export type CreateSupplyRequestInput = z.infer<typeof createSupplyRequestSchema>
 export type UpdateSupplyStatusInput = z.infer<typeof updateSupplyStatusSchema>
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>
+export type UpdateExpenseInput = z.infer<typeof updateExpenseSchema>
 export type UpdateExpenseStatusInput = z.infer<typeof updateExpenseStatusSchema>
+
+// =============================================
+// PHASE 2: EXPENSE FILTER & BATCH SCHEMAS
+// =============================================
+
+// Filter params para GET /api/expenses
+export const expenseFilterParams = z.object({
+  status: z.string().optional(), // CSV: 'PENDIENTE_DE_FACTURAR,FACTURADO'
+  period: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  pharmacyId: z.string().optional(),
+  sortBy: z.enum(['createdAt', 'amount', 'expenseNumber']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+})
+
+export type ExpenseFilterParams = z.infer<typeof expenseFilterParams>
+
+// Batch operations request
+export const batchIdsSchema = z.object({
+  expenseIds: z.array(z.string()).min(1, 'Debe incluir al menos un ID').max(50, 'Máximo 50 gastos por operación'),
+  notes: z.string().max(500).optional(),
+})
+
+export type BatchIdsInput = z.infer<typeof batchIdsSchema>
+
+// Batch report (includes period)
+export const batchReportSchema = z.object({
+  expenseIds: z.array(z.string()).min(1).max(50),
+  period: z.string().regex(/^\d{4}-\d{2}$/, 'Formato: YYYY-MM'),
+  notes: z.string().max(500).optional(),
+})
+
+export type BatchReportInput = z.infer<typeof batchReportSchema>

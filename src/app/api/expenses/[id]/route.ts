@@ -3,9 +3,30 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
-import { updateExpenseStatusSchema } from '@/lib/validations'
-import { UserRole, ApiResponse } from '@/types'
+import { updateExpenseStatusSchema, updateExpenseSchema } from '@/lib/validations'
+import { UserRole, ApiResponse, ExpenseStatus } from '@/types'
 import { isAdmin } from '@/lib/roles'
+
+// =============================================
+// STATUS TRANSITION VALIDATION
+// Valid transitions:
+// - PENDIENTE_DE_FACTURAR → FACTURADO (requires pdfUrl + xmlUrl)
+// - FACTURADO → REPORTED
+// - REPORTED → PENDIENTE_DE_PAGO
+// - PENDIENTE_DE_PAGO → PAID
+// =============================================
+
+const VALID_TRANSITIONS: Record<ExpenseStatus, ExpenseStatus[]> = {
+  [ExpenseStatus.PENDIENTE_DE_FACTURAR]: [ExpenseStatus.FACTURADO],
+  [ExpenseStatus.FACTURADO]: [ExpenseStatus.REPORTED],
+  [ExpenseStatus.REPORTED]: [ExpenseStatus.PENDIENTE_DE_PAGO],
+  [ExpenseStatus.PENDIENTE_DE_PAGO]: [ExpenseStatus.PAID],
+  [ExpenseStatus.PAID]: [],
+}
+
+function isValidTransition(fromStatus: ExpenseStatus, toStatus: ExpenseStatus): boolean {
+  return VALID_TRANSITIONS[fromStatus]?.includes(toStatus) ?? false
+}
 
 // =============================================
 // GET /api/expenses/[id]
@@ -28,7 +49,6 @@ export async function GET(
     }
 
     // Solo admins/supervisor pueden ver cualquier gasto
-    // Otros roles solo ven sus propios gastos
     const isAdminRole = (role: UserRole) => role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN || role === UserRole.SUPERVISOR
     
     if (!isAdminRole(session.user.role as UserRole) && expense.pharmacy.toString() !== session.user.id) {
@@ -44,7 +64,7 @@ export async function GET(
 
 // =============================================
 // PATCH /api/expenses/[id]
-// Solo ADMIN puede cambiar el estado de un gasto
+// Phase 2: Status transitions + pharmacy editing
 // =============================================
 export async function PATCH(
   req: NextRequest,
@@ -56,37 +76,120 @@ export async function PATCH(
       return NextResponse.json<ApiResponse>({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
-    if (!isAdmin(session.user.role as UserRole)) {
-      return NextResponse.json<ApiResponse>({ success: false, error: 'Solo el supervisor puede revisar gastos' }, { status: 403 })
-    }
-
     const body = await req.json()
-    const validation = updateExpenseStatusSchema.safeParse(body)
-
-    if (!validation.success) {
-      return NextResponse.json<ApiResponse>(
-        { success: false, error: validation.error.errors[0]?.message },
-        { status: 400 }
-      )
-    }
-
+    const userRole = session.user.role as UserRole
+    
+    // Get expense to check current status
     await connectDB()
-    const expense = await Expense.findByIdAndUpdate(
-      params.id,
-      {
-        status: validation.data.status,
-        adminComment: validation.data.adminComment,
-        reviewedBy: session.user.id,
-        reviewedAt: new Date(),
-      },
-      { new: true, runValidators: true }
-    )
-
-    if (!expense) {
+    const existingExpense = await Expense.findById(params.id)
+    
+    if (!existingExpense) {
       return NextResponse.json<ApiResponse>({ success: false, error: 'Gasto no encontrado' }, { status: 404 })
     }
 
-    return NextResponse.json<ApiResponse>({ success: true, data: expense })
+    // Determine if this is a status change or field update
+    const newStatus = body.status
+    const isFieldUpdate = !newStatus
+
+    if (newStatus && isAdmin(userRole)) {
+      // =============================================
+      // SUPERVISOR: Can change status with validation
+      // =============================================
+      
+      // Validate status transition
+      const currentStatus = existingExpense.status as ExpenseStatus
+      if (!isValidTransition(currentStatus, newStatus)) {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: `Transición inválida: ${currentStatus} → ${newStatus}` },
+          { status: 400 }
+        )
+      }
+
+      // Phase 2: Require pdfUrl + xmlUrl for PENDIENTE_DE_FACTURAR → FACTURADO
+      if (currentStatus === ExpenseStatus.PENDIENTE_DE_FACTURAR && newStatus === ExpenseStatus.FACTURADO) {
+        if (!body.pdfUrl || !body.xmlUrl) {
+          return NextResponse.json<ApiResponse>(
+            { success: false, error: 'Para FACTURADO se requiere pdfUrl y xmlUrl' },
+            { status: 400 }
+          )
+        }
+      }
+
+      // Update with status transition
+      const updateData: any = {
+        status: newStatus,
+        adminComment: body.adminComment,
+        reviewedBy: session.user.id,
+        reviewedAt: new Date(),
+      }
+
+      // Add CFDI fields if transitioning to FACTURADO
+      if (newStatus === ExpenseStatus.FACTURADO) {
+        if (body.pdfUrl) updateData.pdfUrl = body.pdfUrl
+        if (body.pdfPublicId) updateData.pdfPublicId = body.pdfPublicId
+        if (body.xmlUrl) updateData.xmlUrl = body.xmlUrl
+        if (body.xmlPublicId) updateData.xmlPublicId = body.xmlPublicId
+      }
+
+      // Add period if transitioning to REPORTED
+      if (newStatus === ExpenseStatus.REPORTED && body.period) {
+        updateData.period = body.period
+      }
+
+      const updated = await Expense.findByIdAndUpdate(
+        params.id,
+        updateData,
+        { new: true, runValidators: true }
+      )
+
+      return NextResponse.json<ApiResponse>({ success: true, data: updated })
+    } else if (!newStatus) {
+      // =============================================
+      // PHARMACY: Can edit fields while status !== REPORTED
+      // =============================================
+      const currentStatus = existingExpense.status as ExpenseStatus
+
+      // Block pharmacy editing when status is REPORTED
+      if (currentStatus === ExpenseStatus.REPORTED) {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: 'No puedes editar cuando el gasto está reportado' },
+          { status: 403 }
+        )
+      }
+
+      // Validate fields with schema
+      const validation = updateExpenseSchema.safeParse(body)
+      if (!validation.success) {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: validation.error.errors[0]?.message },
+          { status: 400 }
+        )
+      }
+
+      // Check if this is a modification after initial creation
+      // isModified flag is set if pharmacy edits AND there were already invoice fields
+      const wasAlreadyFacturado = currentStatus === ExpenseStatus.FACTURADO
+      const isModifyingInvoiceFields = body.pdfUrl || body.xmlUrl
+      
+      const updateData: any = { ...validation.data }
+      
+      // Set isModified if pharmacy is editing after being FACTURADO
+      if (wasAlreadyFacturado && isModifyingInvoiceFields) {
+        updateData.isModified = true
+        // If modifying, reset back to PENDIENTE_DE_FACTURAR
+        updateData.status = ExpenseStatus.PENDIENTE_DE_FACTURAR
+      }
+
+      const updated = await Expense.findByIdAndUpdate(
+        params.id,
+        updateData,
+        { new: true, runValidators: true }
+      )
+
+      return NextResponse.json<ApiResponse>({ success: true, data: updated })
+    } else {
+      return NextResponse.json<ApiResponse>({ success: false, error: 'No tienes permisos para cambiar el estado' }, { status: 403 })
+    }
   } catch (error) {
     console.error('[PATCH /api/expenses/[id]]', error)
     return NextResponse.json<ApiResponse>({ success: false, error: 'Error interno' }, { status: 500 })

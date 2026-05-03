@@ -160,7 +160,7 @@ export async function GET(req: NextRequest) {
               {
                 $match: {
                   pharmacy: { $in: objectIdPharmacyIds },
-                  status: 'PENDING',
+                  status: 'PENDIENTE_DE_FACTURAR',
                 },
               },
               {

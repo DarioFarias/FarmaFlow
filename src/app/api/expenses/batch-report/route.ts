@@ -3,122 +3,97 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
-import { UserRole, ExpenseStatus } from '@/types'
+import { batchReportSchema } from '@/lib/validations'
+import { UserRole, ApiResponse, ExpenseStatus } from '@/types'
+import { isAdmin } from '@/lib/roles'
 
 // =============================================
-// API Route: /api/expenses/batch-report
-// Bulk mark expenses as reviewed (REVIEWED status)
+// POST /api/expenses/batch-report
+// Report multiple FACTURADO expenses to accounting
+// Creates/updates Period grouping
 // =============================================
 
-export async function PATCH(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    if (!session?.user) {
+      return NextResponse.json<ApiResponse>({ success: false, error: 'No autorizado' }, { status: 401 })
     }
 
-    // Only ADMIN, SUPER_ADMIN, and SUPERVISOR can batch report
     const userRole = session.user.role as UserRole
-    if (userRole !== UserRole.ADMIN && userRole !== UserRole.SUPER_ADMIN && userRole !== UserRole.SUPERVISOR) {
-      return NextResponse.json({ error: 'No tienes permisos para marcar gastos como revisados' }, { status: 403 })
+    
+    if (!isAdmin(userRole)) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: 'Solo el supervisor puede reportar gastos en lote' },
+        { status: 403 }
+      )
     }
 
     const body = await req.json()
-    const { expenseIds } = body
+    const validation = batchReportSchema.safeParse(body)
 
-    // Validate expenseIds
-    if (!expenseIds || !Array.isArray(expenseIds) || expenseIds.length === 0) {
-      return NextResponse.json(
-        { error: 'Se requiere un array de expenseIds' },
+    if (!validation.success) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: validation.error.errors[0]?.message },
         { status: 400 }
       )
     }
 
     await connectDB()
 
-    // Find all expenses by IDs
-    const expenses = await Expense.find({
-      _id: { $in: expenseIds }
-    })
+    const { expenseIds, period, notes } = validation.data
+    const results: { id: string; success: boolean; error?: string }[] = []
 
-    // Check for invalid IDs
-    const foundIds = expenses.map(e => e._id.toString())
-    const notFoundIds = expenseIds.filter((id: string) => !foundIds.includes(id))
-
-    // Validate: only APPROVED expenses can be marked as REVIEWED
-    const validExpenses: typeof expenses = []
-    const invalidStatusIds: string[] = []
-
-    for (const expense of expenses) {
-      if (expense.status === ExpenseStatus.APPROVED) {
-        validExpenses.push(expense)
-      } else {
-        invalidStatusIds.push(expense._id.toString())
+    // First validate all expenses are FACTURADO
+    for (const id of expenseIds) {
+      const expense = await Expense.findById(id)
+      if (!expense) {
+        results.push({ id, success: false, error: 'No encontrado' })
+        continue
       }
+      if (expense.status !== ExpenseStatus.FACTURADO) {
+        results.push({ id, success: false, error: `Debe estar FACTURADO, estado actual: ${expense.status}` })
+        continue
+      }
+      results.push({ id, success: true })
     }
 
-    // Perform bulk update for valid expenses
-    const processedResults: { id: string, status: string }[] = []
-    let modifiedCount = 0
+    // If any failed validation, return error
+    const invalid = results.filter(r => !r.success)
+    if (invalid.length > 0) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: 'Algunos gastos no pueden ser reportados' },
+        { status: 400 }
+      )
+    }
 
-    if (validExpenses.length > 0) {
-      const validIds = validExpenses.map(e => e._id)
-      
-      const result = await Expense.bulkWrite([
+    // All valid - update all to REPORTED with period
+    const updatePromises = expenseIds.map(id =>
+      Expense.findByIdAndUpdate(
+        id,
         {
-          updateMany: {
-            filter: { _id: { $in: validIds } },
-            update: {
-              $set: {
-                status: ExpenseStatus.REVIEWED,
-                reviewedBy: session.user.id,
-                reviewedAt: new Date()
-              }
-            }
-          }
-        }
-      ])
+          status: ExpenseStatus.REPORTED,
+          period: period,
+          adminComment: notes,
+          reviewedBy: session.user.id,
+          reviewedAt: new Date(),
+        },
+        { new: true }
+      )
+    )
 
-      modifiedCount = result.modifiedCount
+    await Promise.all(updatePromises)
 
-      // Build processed results
-      for (const expense of validExpenses) {
-        processedResults.push({
-          id: expense._id.toString(),
-          status: ExpenseStatus.REVIEWED
-        })
-      }
-    }
-
-    // Build partial errors for invalid IDs
-    const partialErrors: { id: string, reason: string }[] = []
-    
-    for (const id of notFoundIds) {
-      partialErrors.push({
-        id,
-        reason: 'Gasto no encontrado'
-      })
-    }
-    
-    for (const id of invalidStatusIds) {
-      const expense = expenses.find(e => e._id.toString() === id)
-      partialErrors.push({
-        id,
-        reason: `El gasto no está en estado APPROVED (estado actual: ${expense?.status || 'desconocido'})`
-      })
-    }
-
-    return NextResponse.json({
+    return NextResponse.json<ApiResponse>({
       success: true,
-      processedResults,
-      modifiedCount,
-      partialErrors: partialErrors.length > 0 ? partialErrors : undefined
+      data: {
+        processed: expenseIds.length,
+        period,
+        results: expenseIds.map(id => ({ id, success: true })),
+      },
     })
   } catch (error) {
-    console.error('API_BATCH_REPORT_ERROR:', error)
-    return NextResponse.json(
-      { error: 'Error al marcar gastos como revisados' },
-      { status: 500 }
-    )
+    console.error('[POST /api/expenses/batch-report]', error)
+    return NextResponse.json<ApiResponse>({ success: false, error: 'Error interno' }, { status: 500 })
   }
 }

@@ -12,7 +12,7 @@ import {
   pharmacyUpdateSchema,
   adminUpdateUserSchema,
 } from './validations'
-import { SupplyCategory, ExpenseCategory, SupplyRequestStatus, ExpenseStatus } from '../types'
+import { SupplyCategory, ExpenseCategory, SupplyRequestStatus, ExpenseStatus, ExpenseStatusLegacy } from '../types'
 
 describe('Validations - Login', () => {
   it('validates correct email and password', () => {
@@ -235,27 +235,67 @@ describe('Validations - Update Supply Status', () => {
 })
 
 describe('Validations - Update Expense Status', () => {
-  it('validates approved status with comment', () => {
+  // Phase 2: New status workflow (V2)
+  it('validates PENDIENTE_DE_FACTURAR status', () => {
     const result = updateExpenseStatusSchema.safeParse({
-      status: ExpenseStatus.APPROVED,
+      status: ExpenseStatus.PENDIENTE_DE_FACTURAR,
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('validates FACTURADO status with comment', () => {
+    const result = updateExpenseStatusSchema.safeParse({
+      status: ExpenseStatus.FACTURADO,
+      adminComment: 'Factura verificada',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('validates REPORTED status', () => {
+    const result = updateExpenseStatusSchema.safeParse({
+      status: ExpenseStatus.REPORTED,
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('validates PENDIENTE_DE_PAGO status', () => {
+    const result = updateExpenseStatusSchema.safeParse({
+      status: ExpenseStatus.PENDIENTE_DE_PAGO,
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('validates PAID status with comment', () => {
+    const result = updateExpenseStatusSchema.safeParse({
+      status: ExpenseStatus.PAID,
+      adminComment: 'Pago confirmado',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  // Legacy status (deprecated - for migration compatibility)
+  it('validates legacy APPROVED status (deprecated)', () => {
+    const result = updateExpenseStatusSchema.safeParse({
+      status: ExpenseStatusLegacy.APPROVED,
       adminComment: 'Gasto verificado y aprobado',
     })
-    expect(result.success).toBe(true)
+    // This should fail because the schema now only accepts ExpenseStatus (not legacy)
+    expect(result.success).toBe(false)
   })
 
-  it('validates disputed status', () => {
+  it('validates legacy DISPUTED status (deprecated)', () => {
     const result = updateExpenseStatusSchema.safeParse({
-      status: ExpenseStatus.DISPUTED,
+      status: ExpenseStatusLegacy.DISPUTED,
       adminComment: 'Falta factura original',
     })
-    expect(result.success).toBe(true)
+    expect(result.success).toBe(false)
   })
 
-  it('validates reviewed status', () => {
+  it('validates legacy REVIEWED status (deprecated)', () => {
     const result = updateExpenseStatusSchema.safeParse({
-      status: ExpenseStatus.REVIEWED,
+      status: ExpenseStatusLegacy.REVIEWED,
     })
-    expect(result.success).toBe(true)
+    expect(result.success).toBe(false)
   })
 
   it('rejects invalid status', () => {

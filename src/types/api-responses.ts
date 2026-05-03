@@ -127,3 +127,67 @@ export interface PaginatedResponse<T> {
   pageSize: number
   totalPages: number
 }
+
+// =============================================
+// PHASE 3: EXPENSE MODULE V2 - TIPOS ADICIONALES
+// =============================================
+
+// ---- RESPUESTA DE OPERACIÓN BATCH ----
+export interface IBatchOperationResponse {
+  success: boolean
+  processedCount: number
+  errors?: string[]
+  message?: string
+}
+
+// ---- PERÍODO CONTABLE ----
+export interface IPeriodData {
+  period: string  // Formato YYYY-MM
+  year: number
+  month: number
+  label: string  // "Enero 2026"
+  isActive: boolean
+}
+
+// ---- RESPUEStA DE EXPENSE CON CAMPOS V2 ----
+export interface IExpenseResponseV2 extends IExpenseResponse {
+  pdfUrl?: string
+  pdfPublicId?: string
+  xmlUrl?: string
+  xmlPublicId?: string
+  isModified?: boolean
+  period?: string
+}
+
+// ---- PARAMS DE FILTRO PARA GET EXPENSES ----
+export interface IExpenseFilterParams {
+  status?: string          // CSV: 'PENDIENTE_DE_FACTURAR,FACTURADO'
+  period?: string         // YYYY-MM
+  pharmacyId?: string
+  startDate?: string      // ISO date
+  endDate?: string       // ISO date
+  sortBy?: 'createdAt' | 'amount' | 'expenseNumber'
+  sortOrder?: 'asc' | 'desc'
+  page?: number
+  pageSize?: number
+}
+
+// ---- REPORTE DE GASTOS FILTRADO (para supervisor) ----
+export interface IExpenseFilterResponse {
+  expenses: IExpenseResponseV2[]
+  filters: {
+    status?: string
+    period?: string
+    pharmacyId?: string
+    dateRange?: {
+      from: string
+      to: string
+    }
+  }
+  pagination: {
+    page: number
+    pageSize: number
+    total: number
+    totalPages: number
+  }
+}
