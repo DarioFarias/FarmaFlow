@@ -104,6 +104,8 @@ ExpenseSchema.index({ status: 1 })
 ExpenseSchema.index({ expenseNumber: 1 })
 ExpenseSchema.index({ category: 1 })
 ExpenseSchema.index({ receiptDate: -1 })
+// Compound index for common query pattern {pharmacy, status, createdAt}
+ExpenseSchema.index({ pharmacy: 1, status: 1, createdAt: -1 })
 
 // ---- MODELO ----
 const Expense: Model<IExpenseDocument> =

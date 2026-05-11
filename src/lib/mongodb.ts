@@ -34,6 +34,8 @@ async function connectDB() {
     const opts = {
       bufferCommands: false,
       dbName: 'farmaflow',
+      serverSelectionTimeoutMS: 15000,
+      socketTimeoutMS: 45000,
     }
 
     cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { useSession } from 'next-auth/react'
@@ -8,9 +8,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { createExpenseSchema, type CreateExpenseInput } from '@/lib/validations'
 import { ExpenseCategory } from '@/types'
 import { toast } from 'react-hot-toast'
-import { Loader2, ArrowLeft, Camera, Send, FileText } from 'lucide-react'
+import { Loader2, ArrowLeft, Camera, Send } from 'lucide-react'
 import Link from 'next/link'
 import { compressImage } from '@/lib/image-utils'
+import { useMyPharmacies } from '@/lib/hooks/use-my-pharmacies'
 
 interface MyPharmacy {
   pharmacyId: string
@@ -35,39 +36,13 @@ export function ExpenseForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [myPharmacies, setMyPharmacies] = useState<MyPharmacy[]>([])
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string>('')
 
   const userRole = session?.user?.role
   const isAdmin = isAdminRole(userRole)
 
-  // Cargar las pharmacies asignadas al usuario
-  // ADMIN/SUPER_ADMIN siempre cargan (reciben todas las pharmacies)
-  // Otros roles solo cargan si tienen assignedPharmacies
-  useEffect(() => {
-    const fetchMyPharmacies = async () => {
-      try {
-        const res = await fetch('/api/my-pharmacies')
-        if (res.ok) {
-          const data = await res.json()
-          setMyPharmacies(data.data || [])
-
-          // Auto-seleccionar si solo tiene una pharmacy
-          if (data.data?.length === 1) {
-            setSelectedPharmacyId(data.data[0].pharmacyId)
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching my pharmacies:', error)
-      }
-    }
-
-    // Cargar siempre para ADMIN, o si tiene assignedPharmacies para otros roles
-    const hasAssignedPharmacies = (session?.user?.assignedPharmacies?.length ?? 0) > 0
-    if (isAdmin || hasAssignedPharmacies) {
-      fetchMyPharmacies()
-    }
-  }, [session, isAdmin])
+  // Use React Query hook for caching pharmacy data
+  const { pharmacies: myPharmacies, isLoading: isLoadingPharmacies } = useMyPharmacies()
 
   // ADMIN siempre ve el selector (aunque tenga 1 pharmacy)
   // Otros roles ven el selector solo si tienen múltiples pharmacies
@@ -87,6 +62,11 @@ export function ExpenseForm() {
     },
   })
 
+  // Auto-select if only one pharmacy
+  if (myPharmacies.length === 1 && !selectedPharmacyId) {
+    setSelectedPharmacyId(myPharmacies[0].pharmacyId)
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -96,18 +76,21 @@ export function ExpenseForm() {
     }
   }
 
-  const uploadToCloudinary = async (file: Blob) => {
+  // Upload to server API which proxies to Cloudinary
+  const uploadInvoiceImage = async (file: Blob, pharmacyCode: string) => {
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('upload_preset', 'ml_default') // Ajustar si tenés uno específico
+    formData.append('pharmacyCode', pharmacyCode)
 
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    const response = await fetch('/api/expenses/upload', {
       method: 'POST',
       body: formData,
     })
 
-    if (!response.ok) throw new Error('Error al subir la imagen a Cloudinary')
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Error al subir la imagen')
+    }
     return response.json()
   }
 
@@ -117,15 +100,22 @@ export function ExpenseForm() {
       return
     }
 
+    // Determine pharmacy code for upload
+    const uploadPharmacyCode = selectedPharmacyId || myPharmacies[0]?.pharmacyId
+    if (!uploadPharmacyCode) {
+      toast.error('Debes seleccionar una farmacia')
+      return
+    }
+
     setIsLoading(true)
     try {
-      // 1. Comprimir imagen (Requisito del usuario: ocupen el menor espacio)
+      // 1. Comprimir imagen
       toast.loading('Comprimiendo imagen...', { id: 'expense-load' })
       const compressedBlob = await compressImage(selectedFile, 1000, 0.6)
 
-      // 2. Subir a Cloudinary
+      // 2. Subir al servidor (que proxya a Cloudinary)
       toast.loading('Subiendo comprobante...', { id: 'expense-load' })
-      const cloudData = await uploadToCloudinary(compressedBlob)
+      const cloudData = await uploadInvoiceImage(compressedBlob, uploadPharmacyCode)
 
       // 3. Guardar en la API
       toast.loading('Guardando registro...', { id: 'expense-load' })
@@ -134,8 +124,8 @@ export function ExpenseForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...data,
-          invoiceImageUrl: cloudData.secure_url,
-          invoicePublicId: cloudData.public_id,
+          invoiceImageUrl: cloudData.url,
+          invoicePublicId: cloudData.publicId,
           // Incluir pharmacyId si el usuario tiene farmacias asignadas
           ...(myPharmacies.length > 0 && selectedPharmacyId
             ? { pharmacyId: selectedPharmacyId }
@@ -189,12 +179,22 @@ export function ExpenseForm() {
               {/* Selector de Farmacia - mostrar para ADMIN o si tiene 2+ */}
               {showPharmacySelector && myPharmacies.length > 0 && (
                 <div className="space-y-2">
-                  <label className="label">Farmacia</label>
+                  <label className="label">
+                    {isLoadingPharmacies ? (
+                      <span className="flex items-center gap-1">
+                        <Loader2 size={14} className="animate-spin" />
+                        Cargando farmacias...
+                      </span>
+                    ) : (
+                      'Farmacia'
+                    )}
+                  </label>
                   <select
                     value={selectedPharmacyId}
                     onChange={(e) => setSelectedPharmacyId(e.target.value)}
                     className="input"
                     required={isAdmin}
+                    disabled={isLoadingPharmacies}
                   >
                     <option value="">Seleccionar farmacia...</option>
                     {myPharmacies.map(p => (

@@ -5,6 +5,17 @@ import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
 import { createExpenseSchema, paginationParams } from '@/lib/validations'
 import { UserRole, ExpenseStatus } from '@/types'
+import { TTLCache } from '@/lib/ttl-cache'
+
+// TTL cache for Pharmacy queries (60 seconds)
+const pharmacyCache = new TTLCache<Array<{ _id: any }>>(60_000)
+
+/**
+ * Generates a cache key for pharmacy queries
+ */
+function getPharmacyCacheKey(pharmacyIds: string[]): string {
+  return [...pharmacyIds].sort().join(',')
+}
 
 // =============================================
 // API Route: /api/expenses
@@ -147,12 +158,21 @@ export async function GET(req: NextRequest) {
     if (userRole === UserRole.SUPERVISOR) {
       const assignedPharmacies = session.user.assignedPharmacies || []
       if (assignedPharmacies.length > 0) {
-        // Filtrar por _id en la colección Pharmacy (no en User)
-        const { default: Pharmacy } = await import('@/models/Pharmacy')
-        const assignedPharmaciesDocs = await Pharmacy.find({
-          _id: { $in: assignedPharmacies },
-          isActive: true
-        }).select('_id')
+        // Use TTL cache to avoid redundant Pharmacy queries
+        const cacheKey = getPharmacyCacheKey(assignedPharmacies)
+        let assignedPharmaciesDocs = pharmacyCache.get(cacheKey)
+
+        if (!assignedPharmaciesDocs) {
+          // Cache miss - fetch from database
+          const { default: Pharmacy } = await import('@/models/Pharmacy')
+          assignedPharmaciesDocs = await Pharmacy.find({
+            _id: { $in: assignedPharmacies },
+            isActive: true
+          }).select('_id') as Array<{ _id: any }>
+          // Store in cache
+          pharmacyCache.set(cacheKey, assignedPharmaciesDocs)
+        }
+
         const pharmacyIds = assignedPharmaciesDocs.map(p => p._id)
         query = { pharmacy: { $in: pharmacyIds } }
       } else {

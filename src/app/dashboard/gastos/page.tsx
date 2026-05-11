@@ -1,14 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { Receipt, Plus, Loader2 } from 'lucide-react'
+import { Receipt, Plus, Loader2, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { UserRole, ExpenseStatus } from '@/types'
-import { IExpenseResponse } from '@/types/api-responses'
 import { AuditActions } from '@/components/audit/AuditActions'
+import { useExpenses } from '@/lib/hooks/use-expenses'
 
 const STATUS_CONFIG: Record<string, { label: string, classes: string }> = {
   [ExpenseStatus.PENDING]: { label: 'Pendiente', classes: 'bg-amber-50 text-amber-700 ring-amber-600/20' },
@@ -24,40 +22,33 @@ function isAdminUser(role?: string): boolean {
 
 export default function GastosPage() {
   const { data: session } = useSession()
-  const [gastos, setGastos] = useState<IExpenseResponse[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-
+  
   const userRole = session?.user?.role as UserRole | undefined
   const isUserAdmin = isAdminUser(userRole)
 
-  useEffect(() => {
-    fetchGastos()
-  }, [])
-
-  const fetchGastos = async () => {
-    try {
-      const res = await fetch('/api/expenses')
-      const data = await res.json()
-      
-      let items: IExpenseResponse[] = []
-      if (data && Array.isArray(data.data)) {
-        items = data.data as IExpenseResponse[]
-      } else if (Array.isArray(data)) {
-        items = data as IExpenseResponse[]
-      }
-
-      setGastos(items)
-    } catch (error) {
-      console.error('Error fetching expenses:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const { expenses, isLoading, error, refetch } = useExpenses()
 
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="animate-spin text-brand-500" size={32} />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <div className="flex items-center gap-2 text-red-600">
+          <AlertCircle size={24} />
+          <span>Error al cargar los gastos</span>
+        </div>
+        <button 
+          onClick={() => refetch()}
+          className="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
+        >
+          Reintentar
+        </button>
       </div>
     )
   }
@@ -69,10 +60,10 @@ export default function GastosPage() {
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Gastos</h1>
           <p className="text-gray-500 mt-1 text-sm">Registra y gestiona los gastos operativos.</p>
         </div>
-        <Link href="/dashboard/gastos/nuevo" className="btn-primary flex items-center gap-2">
+        <a href="/dashboard/gastos/nuevo" className="btn-primary flex items-center gap-2">
           <Plus size={18} />
           Nuevo Gasto
-        </Link>
+        </a>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -94,7 +85,7 @@ export default function GastosPage() {
             </tr>
           </thead>
           <tbody>
-            {gastos.length === 0 ? (
+            {expenses.length === 0 ? (
               <tr>
                 <td colSpan={isUserAdmin ? 8 : 6} className="py-12 text-center">
                   <Receipt size={32} className="mx-auto mb-3 text-gray-300" />
@@ -102,7 +93,7 @@ export default function GastosPage() {
                 </td>
               </tr>
             ) : (
-              gastos.map((g) => {
+              expenses.map((g) => {
                 const statusInfo = STATUS_CONFIG[g.status] || { label: g.status, classes: 'bg-gray-50' }
                 return (
                   <tr key={g._id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/30 transition-colors">
