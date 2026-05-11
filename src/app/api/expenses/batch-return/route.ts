@@ -69,11 +69,8 @@ export async function PATCH(req: NextRequest) {
           updateMany: {
             filter: { _id: { $in: validIds } },
             update: {
-              $set: {
-                status: ExpenseStatus.PENDING,
-                reviewedBy: null,
-                reviewedAt: null
-              }
+              $set: { status: ExpenseStatus.PENDING },
+              $unset: { reviewedBy: "", reviewedAt: "" }
             }
           }
         }
