@@ -37,6 +37,7 @@ async function migrateExpenses() {
   // 1. Contar expenses con estados legacy (usar consulta directa a MongoDB)
   const legacyStatuses = ['PENDING', 'REVIEWED', 'APPROVED', 'DISPUTED']
   const db = mongoose.connection.db
+  if (!db) throw new Error('❌ MongoDB connection db is not available')
   const legacyExpenses = await db.collection('expenses').find({ status: { $in: legacyStatuses } }).toArray()
 
   console.log(`📊 Gastos con estados legacy encontrados: ${legacyExpenses.length}`)

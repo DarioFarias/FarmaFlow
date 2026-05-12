@@ -101,15 +101,7 @@ export default function GastosPage() {
   const userRole = session?.user?.role as UserRole | undefined
   const isUserAdmin = isAdminUser(userRole)
 
-<<<<<<< HEAD
-  // Build query string from filters and pagination
-  // Use individual deps to avoid infinite loops from object references
-=======
-  // Ref to track if initial fetch is done - prevents duplicate fetches
-  const initialFetchDone = useRef(false)
-
   // Build query string from filters and pagination - ONLY recalculate on actual filter/page changes
->>>>>>> fe02cee (fix: prevent infinite re-renders and duplicate fetches in GastosPage)
   const buildQueryParams = useCallback(() => {
     const params = new URLSearchParams()
     params.set('page', pagination.page.toString())
@@ -155,17 +147,10 @@ export default function GastosPage() {
     }
   }, [buildQueryParams])
 
-<<<<<<< HEAD
-  // Fetch pharmacies for admin filter - only once
-  const fetchPharmacies = useCallback(async () => {
-    if (!isUserAdmin || pharmacies.length > 0) return
-
-=======
   // Fetch pharmacies for admin filter - ONLY fetch once
   const fetchPharmacies = useCallback(async () => {
     if (!isUserAdmin || pharmacies.length > 0) return // Already fetched
     
->>>>>>> fe02cee (fix: prevent infinite re-renders and duplicate fetches in GastosPage)
     try {
       const res = await fetch('/api/my-pharmacies')
       const data = await res.json()
@@ -179,18 +164,11 @@ export default function GastosPage() {
   }, [isUserAdmin, pharmacies.length])
 
   // Initial data fetch - ONLY on mount
-<<<<<<< HEAD
-  useEffect(() => {
-    if (initialFetchDone.current) return
-    initialFetchDone.current = true
-
-=======
   // Pagination and filter changes are handled by the button handlers directly
   useEffect(() => {
     if (initialFetchDone.current) return
     initialFetchDone.current = true
     
->>>>>>> fe02cee (fix: prevent infinite re-renders and duplicate fetches in GastosPage)
     fetchGastos(true)
     fetchPharmacies()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -252,11 +230,7 @@ export default function GastosPage() {
 
   const clearSelection = () => {
     setSelectedIds([])
-<<<<<<< HEAD
-    // Refresh data after batch action (no loading spinner)
-=======
     // Refresh data after batch action (no loading spinner for this refresh)
->>>>>>> fe02cee (fix: prevent infinite re-renders and duplicate fetches in GastosPage)
     fetchGastos(false)
   }
 

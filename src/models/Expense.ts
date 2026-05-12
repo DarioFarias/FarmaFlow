@@ -2,7 +2,9 @@ import mongoose, { Schema, Document, Model } from 'mongoose'
 import { IExpense, ExpenseStatus } from '@/types'
 
 // ---- INTERFACE MONGOOSE ----
-export interface IExpenseDocument extends Omit<IExpense, '_id'>, Document {}
+export interface IExpenseDocument extends Omit<IExpense, '_id'>, Omit<Document, 'isModified'> {
+  isModified?: boolean
+}
 
 // ---- ESQUEMA ----
 const ExpenseSchema = new Schema<IExpenseDocument>(
