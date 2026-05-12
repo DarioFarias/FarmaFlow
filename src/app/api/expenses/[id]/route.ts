@@ -48,10 +48,13 @@ export async function GET(
       return NextResponse.json<ApiResponse>({ success: false, error: 'Gasto no encontrado' }, { status: 404 })
     }
 
-    // Solo admins/supervisor pueden ver cualquier gasto
-    const isAdminRole = (role: UserRole) => role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN || role === UserRole.SUPERVISOR
-    
-    if (!isAdminRole(session.user.role as UserRole) && expense.pharmacy.toString() !== session.user.id) {
+    // Check access: admin sees all, non-admin must belong to the expense's pharmacy
+    const userRole = session.user.role as UserRole
+    const userIsAdmin = isAdmin(userRole)
+    const assignedPharmacies = session.user.assignedPharmacies || []
+    const expensePharmacyId = expense.pharmacy.toString()
+
+    if (!userIsAdmin && !assignedPharmacies.includes(expensePharmacyId)) {
       return NextResponse.json<ApiResponse>({ success: false, error: 'Acceso denegado' }, { status: 403 })
     }
 
@@ -147,6 +150,18 @@ export async function PATCH(
       // =============================================
       // PHARMACY: Can edit fields while status !== REPORTED
       // =============================================
+      // Ownership check: non-admin users can only edit their own pharmacy's expenses
+      const userIsAdmin = isAdmin(userRole)
+      const assignedPharmacies = session.user.assignedPharmacies || []
+      const expensePharmacyId = existingExpense.pharmacy.toString()
+
+      if (!userIsAdmin && !assignedPharmacies.includes(expensePharmacyId)) {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: 'No tienes acceso a este gasto' },
+          { status: 403 }
+        )
+      }
+
       const currentStatus = existingExpense.status as ExpenseStatus
 
       // Block pharmacy editing when status is REPORTED
@@ -172,10 +187,10 @@ export async function PATCH(
       const isModifyingInvoiceFields = body.pdfUrl || body.xmlUrl
       
       const updateData: any = { ...validation.data }
-      
-      // Set isModified if pharmacy is editing after being FACTURADO
+
+      // Set wasModified if pharmacy is editing after being FACTURADO
       if (wasAlreadyFacturado && isModifyingInvoiceFields) {
-        updateData.isModified = true
+        updateData.wasModified = true
         // If modifying, reset back to PENDIENTE_DE_FACTURAR
         updateData.status = ExpenseStatus.PENDIENTE_DE_FACTURAR
       }

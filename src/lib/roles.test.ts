@@ -12,8 +12,8 @@ describe('Roles Helpers', () => {
       expect(isAdmin(UserRole.SUPER_ADMIN)).toBe(true)
     })
 
-    it('returns false for SUPERVISOR role', () => {
-      expect(isAdmin(UserRole.SUPERVISOR)).toBe(false)
+    it('returns true for SUPERVISOR role (admin for expense management)', () => {
+      expect(isAdmin(UserRole.SUPERVISOR)).toBe(true)
     })
 
     it('returns false for undefined', () => {

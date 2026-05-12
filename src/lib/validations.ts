@@ -332,8 +332,8 @@ export type UpdateExpenseStatusInput = z.infer<typeof updateExpenseStatusSchema>
 export const expenseFilterParams = z.object({
   status: z.string().optional(), // CSV: 'PENDIENTE_DE_FACTURAR,FACTURADO'
   period: z.string().regex(/^\d{4}-\d{2}$/).optional(),
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   pharmacyId: z.string().optional(),
   sortBy: z.enum(['createdAt', 'amount', 'expenseNumber']).optional(),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),

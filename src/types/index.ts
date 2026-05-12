@@ -178,8 +178,8 @@ export interface IExpense {
   xmlPublicId?: string     // Public ID del XML en Cloudinary
   
   // Tracking & Modification
-  isModified?: boolean      // Si el gasto fue modificado después de aprobado
-  period?: Period           // Periodo contable (YYYY-MM)
+  wasModified?: boolean     // Si el gasto fue modificado después de aprobado
+  period?: Period          // Periodo contable (YYYY-MM)
   
 status: ExpenseStatus
   reviewedBy?: string       // User ID del supervisor que revisó

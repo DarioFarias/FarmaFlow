@@ -108,10 +108,11 @@ export function canEditUser(editorRole?: UserRole, targetRole?: UserRole): boole
 // =============================================
 
 /**
- * Verifica si un rol tiene permisos de administrador (Admin o Super Admin)
+ * Verifica si un rol tiene permisos de administrador para gestión de gastos
+ * Incluye ADMIN, SUPER_ADMIN y SUPERVISOR (este último puede aprobar/gastar)
  */
 export function isAdmin(role?: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN
+  return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN || role === UserRole.SUPERVISOR
 }
 
 /**

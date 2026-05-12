@@ -155,7 +155,7 @@ export interface IExpenseResponseV2 extends IExpenseResponse {
   pdfPublicId?: string
   xmlUrl?: string
   xmlPublicId?: string
-  isModified?: boolean
+  wasModified?: boolean
   period?: string
 }
 

@@ -158,9 +158,9 @@ describe('Phase 1.2: IExpense Interface Updates - New Fields', () => {
       status: ExpenseStatus.PENDIENTE_DE_FACTURAR,
       createdAt: new Date(),
       updatedAt: new Date(),
-      isModified: true,
+      wasModified: true,
     }
-    expect(expense.isModified).toBe(true)
+    expect(expense.wasModified).toBe(true)
   })
 
   it('should have period field in IExpense', () => {

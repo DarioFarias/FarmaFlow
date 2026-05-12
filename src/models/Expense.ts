@@ -3,7 +3,7 @@ import { IExpense, ExpenseStatus } from '@/types'
 
 // ---- INTERFACE MONGOOSE ----
 export interface IExpenseDocument extends Omit<IExpense, '_id'>, Omit<Document, 'isModified'> {
-  isModified?: boolean
+  wasModified?: boolean
 }
 
 // ---- ESQUEMA ----
@@ -71,7 +71,7 @@ const ExpenseSchema = new Schema<IExpenseDocument>(
       trim: true,
     },
     // ---- Tracking & Modification ----
-    isModified: {
+    wasModified: {
       type: Boolean,
       default: false,
     },
@@ -111,7 +111,10 @@ ExpenseSchema.pre('save', async function (this: IExpenseDocument, next) {
   if (!this.isNew) return next()
 
   const count = await mongoose.model('Expense').countDocuments()
-  const year = new Date().getFullYear()
+  // Use receiptDate year if available, otherwise use current year
+  const year = this.receiptDate
+    ? new Date(this.receiptDate).getFullYear()
+    : new Date().getFullYear()
   // @ts-ignore - Propiedad existe en el esquema y en la interfaz (Omit<IExpense, '_id'>)
   this.expenseNumber = `EXP-${year}-${String(count + 1).padStart(4, '0')}`
   next()
@@ -127,7 +130,7 @@ ExpenseSchema.index({ receiptDate: -1 })
 ExpenseSchema.index({ period: 1 })
 ExpenseSchema.index({ pdfPublicId: 1 })
 ExpenseSchema.index({ xmlPublicId: 1 })
-ExpenseSchema.index({ isModified: 1 })
+ExpenseSchema.index({ wasModified: 1 })
 // Compound index for common query pattern {pharmacy, status, createdAt}
 ExpenseSchema.index({ pharmacy: 1, status: 1, createdAt: -1 })
 

@@ -6,6 +6,7 @@ import Expense from '@/models/Expense'
 import { createExpenseSchema, paginationParams, expenseFilterParams } from '@/lib/validations'
 import { UserRole, ExpenseStatus } from '@/types'
 import { TTLCache } from '@/lib/ttl-cache'
+import { isAdmin } from '@/lib/roles'
 
 // TTL cache for Pharmacy queries (60 seconds)
 const pharmacyCache = new TTLCache<Array<{ _id: any }>>(60_000)
@@ -219,38 +220,51 @@ export async function GET(req: NextRequest) {
     let query: Record<string, unknown> = {}
     const userRole = session.user.role as UserRole
     const userId = session.user.id
+    const userIsAdmin = isAdmin(userRole)
+    const assignedPharmacies = session.user.assignedPharmacies || []
 
-    // Nota: El rol PHARMACY fue movido a colección Pharmacy
-    // Ahora los usuarios normales ven sus propios gastos
-    // Los SUPERVISOR ven los gastos de farmacias asignadas
-    if (userRole === UserRole.SUPERVISOR) {
-      const assignedPharmacies = session.user.assignedPharmacies || []
-      if (assignedPharmacies.length > 0) {
-        // Use TTL cache to avoid redundant Pharmacy queries
-        const cacheKey = getPharmacyCacheKey(assignedPharmacies)
-        let assignedPharmaciesDocs = pharmacyCache.get(cacheKey)
-
-        if (!assignedPharmaciesDocs) {
-          // Cache miss - fetch from database
-          const { default: Pharmacy } = await import('@/models/Pharmacy')
-          assignedPharmaciesDocs = await Pharmacy.find({
-            _id: { $in: assignedPharmacies },
-            isActive: true
-          }).select('_id') as Array<{ _id: any }>
-          // Store in cache
-          pharmacyCache.set(cacheKey, assignedPharmaciesDocs)
-        }
-
-        const pharmacyIds = assignedPharmaciesDocs.map(p => p._id)
-        query = { pharmacy: { $in: pharmacyIds } }
-      } else {
+    // Role-based pharmacy filtering (Bug #1, Bug #6)
+    if (!userIsAdmin) {
+      // Non-admin users (VENDEDOR, ENCARGADO, SUPERVISOR) - filter by assigned pharmacies
+      if (assignedPharmacies.length === 0) {
+        // No pharmacy assigned - return empty results
         query = { pharmacy: null }
+      } else if (userRole === UserRole.SUPERVISOR) {
+        // SUPERVISOR: Can filter by specific pharmacy if it's in their assignedPharmacies
+        if (filters?.pharmacyId && assignedPharmacies.includes(filters.pharmacyId)) {
+          // pharmacyId is valid - use it
+          query.pharmacy = filters.pharmacyId
+        } else {
+          // Filter by all assigned pharmacies (ignore invalid pharmacyId)
+          // Use cache for Pharmacy lookups
+          const cacheKey = getPharmacyCacheKey(assignedPharmacies)
+          let assignedPharmaciesDocs = pharmacyCache.get(cacheKey)
+
+          if (!assignedPharmaciesDocs) {
+            const { default: Pharmacy } = await import('@/models/Pharmacy')
+            assignedPharmaciesDocs = await Pharmacy.find({
+              _id: { $in: assignedPharmacies },
+              isActive: true
+            }).select('_id') as Array<{ _id: any }>
+            pharmacyCache.set(cacheKey, assignedPharmaciesDocs)
+          }
+
+          const pharmacyIds = assignedPharmaciesDocs.map(p => p._id)
+          query.pharmacy = { $in: pharmacyIds }
+        }
+      } else {
+        // VENDEDOR/ENCARGADO: Force filter by their single pharmacy, IGNORE pharmacyId query param
+        query.pharmacy = assignedPharmacies[0]
       }
     }
-    // ADMIN y SUPER_ADMIN ven todos los gastos
+    // ADMIN/SUPER_ADMIN see all expenses - no pharmacy filter applied
 
-    // Apply additional filters from query params
+    // Apply additional filters (EXCLUDE pharmacyId for non-admin - already handled above)
     const additionalFilters = filters ? buildExpenseFilter(filters) : {}
+    // Remove pharmacyId from additionalFilters for non-admin to prevent override
+    if (!userIsAdmin && additionalFilters.pharmacy) {
+      delete additionalFilters.pharmacy
+    }
     query = { ...query, ...additionalFilters }
 
     // Build sort options
