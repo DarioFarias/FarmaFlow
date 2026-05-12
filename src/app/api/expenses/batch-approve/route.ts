@@ -10,7 +10,8 @@ import { isAdmin } from '@/lib/roles'
 // =============================================
 // POST /api/expenses/batch-approve
 // Approve multiple expenses: PENDIENTE_DE_FACTURAR → FACTURADO
-// or FACTURADO → REPORTED
+// Only handles PENDIENTE_DE_FACTURAR → FACTURADO transition
+// (FACTURADO → REPORTED is handled by batch-report)
 // =============================================
 
 export async function POST(req: NextRequest) {
@@ -43,9 +44,6 @@ export async function POST(req: NextRequest) {
 
     const { expenseIds, notes } = validation.data
     const results: { id: string; success: boolean; error?: string }[] = []
-    const currentYear = new Date().getFullYear()
-    const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0')
-    const period = `${currentYear}-${currentMonth}`
 
     for (const id of expenseIds) {
       try {
@@ -71,15 +69,9 @@ export async function POST(req: NextRequest) {
             reviewedAt: new Date(),
           })
           results.push({ id, success: true })
-        } else if (currentStatus === ExpenseStatus.FACTURADO) {
-          await Expense.findByIdAndUpdate(id, {
-            status: ExpenseStatus.REPORTED,
-            period: period,
-            adminComment: notes,
-            reviewedBy: session.user.id,
-            reviewedAt: new Date(),
-          })
-          results.push({ id, success: true })
+        } else if (currentStatus === ExpenseStatus.FACTURADO || currentStatus === ExpenseStatus.REPORTED) {
+          // Skip expenses already in FACTURADO or REPORTED - only batch-report handles these
+          results.push({ id, success: false, error: `Gasto ya facturado o reportado` })
         } else {
           results.push({ id, success: false, error: `Estado inválido: ${currentStatus}` })
         }
