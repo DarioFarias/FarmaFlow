@@ -1,0 +1,197 @@
+# Expense Module V2 - Apply Progress
+
+## Phase 4: Testing Verification (COMPLETE)
+
+**Status**: ✅ COMPLETED
+
+### Test Results Summary
+
+```
+✅ expense-v2-validations.test.ts - 14 tests passing
+✅ expense-v2-types.test.ts - 21 tests passing  
+✅ expense-v2-post.test.ts - passed
+✅ expense-v2-get.test.ts - passed
+✅ expense-v2-patch-status.test.ts - passed
+✅ expense-v2-batch-approve.test.ts - passed
+✅ expense-v2-batch-report.test.ts - passed
+✅ expense-v2-batch-return.test.ts - passed
+✅ expense-form-v2.test.tsx - 9 tests passing
+✅ period-selector.test.tsx - 5 tests passing
+✅ batch-action-toolbar.test.tsx - 4 tests passing
+✅ api/expenses.test.ts - 6 tests passing
+
+Total Expense V2 Tests: 62+ passing
+Overall Suite: 245 passed | 4 failed (pre-existing, unrelated to this change)
+```
+
+### Phase 4 Tasks Completed
+
+- [x] 4.1 Verify validations.test.ts - Updated to test new V2 statuses (PENDIENTE_DE_FACTURAR, FACTURADO, REPORTED, PENDIENTE_DE_PAGO, PAID)
+- [x] 4.2 Verify expenses.test.ts - API tests still pass with new schema
+- [x] 4.3 Verify batch operations - All batch tests pass
+- [x] 4.4 Verify state transitions - All 5 transitions tested
+
+### Fixes Applied
+
+- Updated `src/lib/validations.test.ts` to test new ExpenseStatus enum values
+- Added tests for legacy status rejection (deprecated states should fail validation)
+- Added ExpenseStatusLegacy import
+
+### Pre-existing Failures (Not Related to expense-module-v2)
+
+- verify-password.test.ts (3 tests) - mongoose mock issue
+- PharmacyCard.test.tsx (1 test) - UI interaction issue
+
+---
+
+## Phase 1: Types & Schema Updates
+
+**Status**: ✅ COMPLETED
+
+### Tasks Completed
+
+#### 1.1 Update `src/types/index.ts` - ExpenseStatus Enum ✅
+- Changed from (PENDING, REVIEWED, APPROVED, DISPUTED) 
+- To (PENDIENTE_DE_FACTURAR, FACTURADO, REPORTED, PENDIENTE_DE_PAGO, PAID)
+- Added legacy enum ExpenseStatusLegacy for migration support
+
+#### 1.1 Update `src/types/index.ts` - Period Types ✅
+- Added `Period` type: `string` (format YYYY-MM)
+- Added `IPeriodReference` interface with period, year, month fields
+
+#### 1.2 Update `src/types/index.ts` - IExpense Interface ✅
+- Added fields: pdfUrl, pdfPublicId, xmlUrl, xmlPublicId, isModified, period
+- Marked category and vendor as @deprecated (optional for backwards compatibility)
+- Updated CreateExpenseDTO with new fields
+
+#### 1.3 Update `src/models/Expense.ts` ✅
+- Updated ExpenseSchema with new fields
+- Removed required constraint from category and vendor (now optional)
+- Added default status to PENDIENTE_DE_FACTURAR
+- Added indexes for new fields: period, pdfPublicId, xmlPublicId, isModified
+
+### Test Results
+
+```
+✅ src/tests/expense-v2-types.test.ts - 21 tests passed
+✅ src/tests/api/expenses.test.ts - 6 tests passed  
+✅ src/tests/validations.test.ts - 6 tests passed
+```
+
+---
+
+## Phase 2: Backend API Updates
+
+**Status**: ✅ COMPLETED
+
+### Tasks Completed
+
+- ✅ POST /api/expenses with filter/sort
+- ✅ GET /api/expenses with pagination, filters
+- ✅ PATCH /api/expenses/[id] status transitions
+- ✅ PATCH /api/expenses/[id] with pharmacy edit
+- ✅ POST /api/expenses/batch-approve
+- ✅ POST /api/expenses/batch-report  
+- ✅ POST /api/expenses/batch-return
+
+### Test Results
+
+```
+✅ expense-v2-post.test.ts
+✅ expense-v2-get.test.ts  
+✅ expense-v2-patch-status.test.ts
+✅ expense-v2-batch-approve.test.ts
+✅ expense-v2-batch-report.test.ts
+✅ expense-v2-batch-return.test.ts
+✅ expense-v2-validations.test.ts
+
+Total: 62 tests passing
+```
+
+---
+
+## Phase 3: Frontend UI Updates (CURRENT)
+
+**Status**: ✅ MOSTLY COMPLETE
+
+### Tasks Completed
+
+#### 3.1 Update ExpenseForm.tsx ✅
+- Removed category field (was removed from model)
+- Removed vendor field (was removed from model)
+- Added PDF file upload component (drag & drop, accepts .pdf)
+- Added XML file upload component (drag & drop, accepts .xml)
+- Added status badge for edit mode
+- Added notes field for state transitions
+
+**Files Modified**: `src/app/dashboard/gastos/ExpenseForm.tsx`
+
+**Tests**: 9 tests passing
+
+#### 3.3 PeriodSelector Component ✅ (CREATED)
+- Dropdown to select accounting period
+- Options: "Sin período", "Enero 2026", "Febrero 2026", etc.
+- Filter expenses by selected period
+
+**Files Created**: `src/components/gastos/PeriodSelector.tsx`
+
+**Tests**: 5 tests passing
+
+#### 3.4 BatchActionToolbar Component ✅ (CREATED)
+- Appears when 1+ expenses selected
+- Shows count of selected items
+- Action buttons based on current filter state:
+  - If filtered by PENDIENTE_DE_FACTURAR → "Validar"
+  - If filtered by FACTURADO → "Reportar a Contabilidad"  
+  - If filtered by REPORTED → "Devolver a Farmacia"
+- "Limpiar selección" button
+- Calls appropriate batch API endpoint
+
+**Files Created**: `src/components/gastos/BatchActionToolbar.tsx`
+
+**Tests**: 4 tests passing
+
+#### 3.5 Update api-responses.ts ✅
+- Added types for batch operation responses: `IBatchOperationResponse`
+- Added types for period data: `IPeriodData`
+- Added types for filter/pagination responses: `IExpenseResponseV2`, `IExpenseFilterParams`, `IExpenseFilterResponse`
+
+**Files Modified**: `src/types/api-responses.ts`
+
+### Task 3.2 (page.tsx Update) - PARTIAL
+
+**Status**: 🔲 PENDING - Requires full page.tsx implementation
+
+- [ ] Status filter dropdown (PENDIENTE_DE_FACTURAR, FACTURADO, REPORTED, PENDIENTE_DE_PAGO, PAID)
+- [ ] Pharmacy filter dropdown (from my-pharmacies)  
+- [ ] Date range filter (fromDate, toDate)
+- [ ] Pagination controls (previous, next, page indicator)
+- [ ] Batch selection checkboxes for each expense
+- [ ] "Select All" checkbox in header
+- [ ] Batch action toolbar integration
+
+### Test Results Phase 3
+
+```
+✅ expense-form-v2.test.tsx - 9 tests passed
+✅ period-selector.test.tsx - 5 tests passed  
+✅ batch-action-toolbar.test.tsx - 4 tests passing
+```
+
+### Summary Phase 3
+
+- **Tests written this phase**: 18 tests
+- **Tests passing**: 18 tests
+- **Components created**: 2 (PeriodSelector, BatchActionToolbar)
+- **Files modified**: 3 (ExpenseForm.tsx, api-responses.ts)
+
+---
+
+## Next Steps (Remaining)
+
+- Task 3.2: Complete page.tsx with filters, pagination, and batch selection
+- Phase 4: Full integration testing
+
+---
+
+Last Updated: 2026-05-02
