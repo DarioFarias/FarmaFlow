@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import GastosPage from '../page'
+import { ExpenseStatus } from '@/types'
 
 // Mock next-auth
 vi.mock('next-auth/react', () => ({
@@ -31,7 +32,7 @@ vi.mock('@/lib/hooks/use-expenses', () => ({
         amount: 1500,
         currency: 'MXN',
         category: 'UTILITIES',
-        status: 'PENDING',
+        status: ExpenseStatus.PENDIENTE_DE_FACTURAR,
       },
       {
         _id: 'exp-2',
@@ -42,13 +43,35 @@ vi.mock('@/lib/hooks/use-expenses', () => ({
         amount: 2500,
         currency: 'MXN',
         category: 'MAINTENANCE',
-        status: 'APPROVED',
+        status: ExpenseStatus.FACTURADO,
+      },
+      {
+        _id: 'exp-3',
+        expenseNumber: 'EXP-2024-0003',
+        receiptDate: '2024-01-17T00:00:00Z',
+        pharmacyName: 'Farmacia Centro',
+        description: 'Gasto reportado',
+        amount: 500,
+        currency: 'MXN',
+        category: 'UTILITIES',
+        status: ExpenseStatus.REPORTED,
+      },
+      {
+        _id: 'exp-4',
+        expenseNumber: 'EXP-2024-0004',
+        receiptDate: '2024-01-18T00:00:00Z',
+        pharmacyName: 'Farmacia Sur',
+        description: 'Gasto pagado',
+        amount: 1000,
+        currency: 'MXN',
+        category: 'MAINTENANCE',
+        status: ExpenseStatus.PAID,
       },
     ],
     isLoading: false,
     error: null,
     refetch: vi.fn(),
-  }))
+  ))
 }))
 
 // Mock AuditActions component
@@ -169,5 +192,152 @@ describe('GastosPage', () => {
 
     expect(screen.getByText(/Error al cargar los gastos/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Reintentar/i })).toBeInTheDocument()
+  })
+
+  describe('Edit button visibility', () => {
+    it('should show edit button for PENDIENTE_DE_FACTURAR status', () => {
+      vi.mocked(useExpenses).mockReturnValueOnce({
+        expenses: [
+          {
+            _id: 'exp-edit-1',
+            expenseNumber: 'EXP-2024-0100',
+            receiptDate: '2024-01-15T00:00:00Z',
+            pharmacyName: 'Farmacia Centro',
+            description: 'Gasto pendiente',
+            amount: 100,
+            currency: 'MXN',
+            category: 'UTILITIES',
+            status: ExpenseStatus.PENDIENTE_DE_FACTURAR,
+          },
+        ],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(
+        <QueryClientProvider client={createTestQueryClient()}>
+          <GastosPage />
+        </QueryClientProvider>
+      )
+
+      expect(screen.getByRole('link', { name: /editar/i })).toBeInTheDocument()
+    })
+
+    it('should show edit button for FACTURADO status', () => {
+      vi.mocked(useExpenses).mockReturnValueOnce({
+        expenses: [
+          {
+            _id: 'exp-edit-2',
+            expenseNumber: 'EXP-2024-0101',
+            receiptDate: '2024-01-16T00:00:00Z',
+            pharmacyName: 'Farmacia Centro',
+            description: 'Gasto facturado',
+            amount: 200,
+            currency: 'MXN',
+            category: 'UTILITIES',
+            status: ExpenseStatus.FACTURADO,
+          },
+        ],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(
+        <QueryClientProvider client={createTestQueryClient()}>
+          <GastosPage />
+        </QueryClientProvider>
+      )
+
+      expect(screen.getByRole('link', { name: /editar/i })).toBeInTheDocument()
+    })
+
+    it('should NOT show edit button for REPORTED status', () => {
+      vi.mocked(useExpenses).mockReturnValueOnce({
+        expenses: [
+          {
+            _id: 'exp-edit-3',
+            expenseNumber: 'EXP-2024-0102',
+            receiptDate: '2024-01-17T00:00:00Z',
+            pharmacyName: 'Farmacia Centro',
+            description: 'Gasto reportado',
+            amount: 300,
+            currency: 'MXN',
+            category: 'UTILITIES',
+            status: ExpenseStatus.REPORTED,
+          },
+        ],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(
+        <QueryClientProvider client={createTestQueryClient()}>
+          <GastosPage />
+        </QueryClientProvider>
+      )
+
+      expect(screen.queryByRole('link', { name: /editar/i })).not.toBeInTheDocument()
+    })
+
+    it('should NOT show edit button for PAID status', () => {
+      vi.mocked(useExpenses).mockReturnValueOnce({
+        expenses: [
+          {
+            _id: 'exp-edit-4',
+            expenseNumber: 'EXP-2024-0103',
+            receiptDate: '2024-01-18T00:00:00Z',
+            pharmacyName: 'Farmacia Centro',
+            description: 'Gasto pagado',
+            amount: 400,
+            currency: 'MXN',
+            category: 'UTILITIES',
+            status: ExpenseStatus.PAID,
+          },
+        ],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(
+        <QueryClientProvider client={createTestQueryClient()}>
+          <GastosPage />
+        </QueryClientProvider>
+      )
+
+      expect(screen.queryByRole('link', { name: /editar/i })).not.toBeInTheDocument()
+    })
+
+    it('should NOT show edit button for PENDIENTE_DE_PAGO status', () => {
+      vi.mocked(useExpenses).mockReturnValueOnce({
+        expenses: [
+          {
+            _id: 'exp-edit-5',
+            expenseNumber: 'EXP-2024-0104',
+            receiptDate: '2024-01-19T00:00:00Z',
+            pharmacyName: 'Farmacia Centro',
+            description: 'Gasto pendiente de pago',
+            amount: 500,
+            currency: 'MXN',
+            category: 'UTILITIES',
+            status: ExpenseStatus.PENDIENTE_DE_PAGO,
+          },
+        ],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(
+        <QueryClientProvider client={createTestQueryClient()}>
+          <GastosPage />
+        </QueryClientProvider>
+      )
+
+      expect(screen.queryByRole('link', { name: /editar/i })).not.toBeInTheDocument()
+    })
   })
 })

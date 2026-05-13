@@ -17,7 +17,11 @@ vi.mock('@/lib/mongodb', () => ({
 
 vi.mock('@/models/Expense', () => ({
   default: {
-    create: vi.fn(),
+    create: vi.fn().mockImplementation((data: any) => {
+      // Simulate Mongoose default for status
+      const doc = { ...data, status: data.status || 'PENDIENTE_DE_FACTURAR' }
+      return Promise.resolve({ _id: 'expense-id-mock', ...doc })
+    }),
   },
 }))
 
@@ -60,7 +64,7 @@ describe('2.2: POST /api/expenses - Phase 2 status logic', () => {
     // Capture the created expense
     let capturedExpense: any = null
     vi.mocked(Expense.create).mockImplementation((data: any) => {
-      capturedExpense = data
+      capturedExpense = { ...data, status: data.status || 'PENDIENTE_DE_FACTURAR' }
       return Promise.resolve({
         _id: 'expense-id-new',
         expenseNumber: 'EXP-2024-0001',
@@ -91,7 +95,7 @@ describe('2.2: POST /api/expenses - Phase 2 status logic', () => {
     expect(capturedExpense.status).toBe(ExpenseStatus.PENDIENTE_DE_FACTURAR)
   })
 
-  it('should set status FACTURADO when pdfUrl and xmlUrl provided', async () => {
+  it('should set status PENDIENTE_DE_FACTURAR even when pdfUrl and xmlUrl provided (no auto-promotion)', async () => {
     // Arrange
     const mockSession = {
       user: {
@@ -111,7 +115,7 @@ describe('2.2: POST /api/expenses - Phase 2 status logic', () => {
 
     let capturedExpense: any = null
     vi.mocked(Expense.create).mockImplementation((data: any) => {
-      capturedExpense = data
+      capturedExpense = { ...data, status: data.status || 'PENDIENTE_DE_FACTURAR' }
       return Promise.resolve({
         _id: 'expense-id-new',
         expenseNumber: 'EXP-2024-0002',
@@ -143,7 +147,7 @@ describe('2.2: POST /api/expenses - Phase 2 status logic', () => {
     // Assert
     expect(response.status).toBe(201)
     expect(capturedExpense).toBeDefined()
-    expect(capturedExpense.status).toBe(ExpenseStatus.FACTURADO)
+    expect(capturedExpense.status).toBe(ExpenseStatus.PENDIENTE_DE_FACTURAR)
   })
 
   it('should set status PENDIENTE_DE_FACTURAR when only pdfUrl (incomplete invoice)', async () => {
@@ -166,7 +170,7 @@ describe('2.2: POST /api/expenses - Phase 2 status logic', () => {
 
     let capturedExpense: any = null
     vi.mocked(Expense.create).mockImplementation((data: any) => {
-      capturedExpense = data
+      capturedExpense = { ...data, status: data.status || 'PENDIENTE_DE_FACTURAR' }
       return Promise.resolve({
         _id: 'expense-id-new',
         expenseNumber: 'EXP-2024-0003',
@@ -220,7 +224,7 @@ describe('2.2: POST /api/expenses - Phase 2 status logic', () => {
 
     let capturedExpense: any = null
     vi.mocked(Expense.create).mockImplementation((data: any) => {
-      capturedExpense = data
+      capturedExpense = { ...data, status: data.status || 'PENDIENTE_DE_FACTURAR' }
       return Promise.resolve({
         _id: 'expense-id-new',
         expenseNumber: 'EXP-2024-0004',

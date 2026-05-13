@@ -20,18 +20,27 @@ export function BatchActionToolbar({
   const [isLoading, setIsLoading] = useState(false)
   const [action, setAction] = useState<BatchAction | null>(null)
 
-  // Determinar acción basada en el filter actual (orden específico)
+  // Determine action based on current filter
+  // Return null for PENDIENTE_DE_PAGO and PAID (no batch actions for these states)
   const getAction = (): BatchAction | null => {
     if (!currentFilter) return 'validate' // Default
-    // ORDEN ESPECÍFICO: primero el más específico
+    // PENDIENTE_DE_PAGO and PAID have no batch actions
+    if (currentFilter === 'PENDIENTE_DE_PAGO' || currentFilter === 'PAID') return null
+    // Order: most specific first
     if (currentFilter === 'REPORTED') return 'return'
-    if (currentFilter === 'FACTURADO') return 'report'  // Segunda etapa
+    if (currentFilter === 'FACTURADO') return 'report'
     if (currentFilter === 'PENDIENTE_DE_FACTURAR') return 'validate'
-    if (currentFilter === 'PENDIENTE_DE_PAGO') return 'validate'
     return 'validate'
   }
 
   const currentAction = action || getAction()
+
+  // Hide toolbar entirely for PENDIENTE_DE_PAGO and PAID states
+  if (currentFilter === 'PENDIENTE_DE_PAGO' || currentFilter === 'PAID') {
+    if (selectedIds.length === 0) return null
+    // Even if items are selected, hide for these states
+    return null
+  }
 
   const getActionLabel = () => {
     if (currentAction === 'validate') return 'Validar'

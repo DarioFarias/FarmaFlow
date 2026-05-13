@@ -382,6 +382,7 @@ export default function GastosPage() {
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Monto</th>
               {/* Removed "Categoría" column as per spec */}
               <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Estado</th>
+              <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Acciones</th>
               {isUserAdmin && (
                 <th className="py-3 px-4 font-semibold text-gray-600 text-sm">Auditoría</th>
               )}
@@ -390,7 +391,7 @@ export default function GastosPage() {
           <tbody>
             {gastos.length === 0 ? (
               <tr>
-                <td colSpan={isUserAdmin ? 7 : 5} className="py-12 text-center">
+                <td colSpan={isUserAdmin ? 8 : 6} className="py-12 text-center">
                   <Receipt size={32} className="mx-auto mb-3 text-gray-300" />
                   <p className="text-gray-400 text-sm italic">No hay gastos registrados todavía.</p>
                 </td>
@@ -434,6 +435,17 @@ export default function GastosPage() {
                       <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold ring-1 ring-inset ${statusInfo.classes}`}>
                         {statusInfo.label}
                       </span>
+                    </td>
+                    {/* Edit button - only for PENDIENTE_DE_FACTURAR */}
+                    <td className="py-3 px-4">
+                      {g.status === ExpenseStatus.PENDIENTE_DE_FACTURAR ? (
+                        <Link
+                          href={`/dashboard/gastos/${g._id}/editar`}
+                          className="text-sm text-brand-600 hover:text-brand-700 font-medium"
+                        >
+                          Editar
+                        </Link>
+                      ) : null}
                     </td>
                     {isUserAdmin && (
                       <td className="py-3 px-4">

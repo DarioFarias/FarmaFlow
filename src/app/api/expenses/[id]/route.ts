@@ -18,7 +18,7 @@ import { isAdmin } from '@/lib/roles'
 
 const VALID_TRANSITIONS: Record<ExpenseStatus, ExpenseStatus[]> = {
   [ExpenseStatus.PENDIENTE_DE_FACTURAR]: [ExpenseStatus.FACTURADO],
-  [ExpenseStatus.FACTURADO]: [ExpenseStatus.REPORTED],
+  [ExpenseStatus.FACTURADO]: [ExpenseStatus.REPORTED, ExpenseStatus.PENDIENTE_DE_FACTURAR], // Admin can undo
   [ExpenseStatus.REPORTED]: [ExpenseStatus.PENDIENTE_DE_PAGO],
   [ExpenseStatus.PENDIENTE_DE_PAGO]: [ExpenseStatus.PAID],
   [ExpenseStatus.PAID]: [],
@@ -90,9 +90,43 @@ export async function PATCH(
       return NextResponse.json<ApiResponse>({ success: false, error: 'Gasto no encontrado' }, { status: 404 })
     }
 
-    // Determine if this is a status change or field update
+    // Determine if this is a status change, reject action, or field update
     const newStatus = body.status
-    const isFieldUpdate = !newStatus
+    const rejectAction = body.action === 'reject'
+    const isFieldUpdate = !newStatus && !rejectAction
+
+    // Handle reject action (no status change, just add adminComment)
+    if (rejectAction && isAdmin(userRole)) {
+      const currentStatus = existingExpense.status as ExpenseStatus
+      
+      // Only PENDIENTE_DE_FACTURAR can be rejected
+      if (currentStatus !== ExpenseStatus.PENDIENTE_DE_FACTURAR) {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: 'Solo puedes rechazar gastos Pendientes de Facturar' },
+          { status: 400 }
+        )
+      }
+
+      // Require adminComment for reject
+      if (!body.adminComment) {
+        return NextResponse.json<ApiResponse>(
+          { success: false, error: 'Para rechazar se requiere un motivo' },
+          { status: 400 }
+        )
+      }
+
+      const updated = await Expense.findByIdAndUpdate(
+        params.id,
+        {
+          adminComment: body.adminComment,
+          reviewedBy: session.user.id,
+          reviewedAt: new Date(),
+        },
+        { new: true, runValidators: true }
+      )
+
+      return NextResponse.json<ApiResponse>({ success: true, data: updated })
+    }
 
     if (newStatus && isAdmin(userRole)) {
       // =============================================
@@ -164,10 +198,10 @@ export async function PATCH(
 
       const currentStatus = existingExpense.status as ExpenseStatus
 
-      // Block pharmacy editing when status is REPORTED
-      if (currentStatus === ExpenseStatus.REPORTED) {
+      // Block pharmacy editing when status is not PENDIENTE_DE_FACTURAR
+      if (currentStatus !== ExpenseStatus.PENDIENTE_DE_FACTURAR) {
         return NextResponse.json<ApiResponse>(
-          { success: false, error: 'No puedes editar cuando el gasto está reportado' },
+          { success: false, error: 'No puedes editar un gasto que ya fue aprobado' },
           { status: 403 }
         )
       }
@@ -181,19 +215,7 @@ export async function PATCH(
         )
       }
 
-      // Check if this is a modification after initial creation
-      // isModified flag is set if pharmacy edits AND there were already invoice fields
-      const wasAlreadyFacturado = currentStatus === ExpenseStatus.FACTURADO
-      const isModifyingInvoiceFields = body.pdfUrl || body.xmlUrl
-      
       const updateData: any = { ...validation.data }
-
-      // Set wasModified if pharmacy is editing after being FACTURADO
-      if (wasAlreadyFacturado && isModifyingInvoiceFields) {
-        updateData.wasModified = true
-        // If modifying, reset back to PENDIENTE_DE_FACTURAR
-        updateData.status = ExpenseStatus.PENDIENTE_DE_FACTURAR
-      }
 
       const updated = await Expense.findByIdAndUpdate(
         params.id,

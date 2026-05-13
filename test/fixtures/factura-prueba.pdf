@@ -1,0 +1,78 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]
+   /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+
+4 0 obj
+<< /Length 448 >>
+stream
+BT
+/F1 24 Tf
+50 730 Td
+(FARMAFLOW) Tj
+/F1 14 Tf
+50 690 Td
+(Factura de Prueba) Tj
+/F1 10 Tf
+50 655 Td
+(RFC: FAR980101AAA) Tj
+50 635 Td
+(Fecha: 12/05/2026) Tj
+50 615 Td
+(Folio: FF-0001) Tj
+/F1 12 Tf
+50 575 Td
+(=== DETALLE ===) Tj
+/F1 10 Tf
+50 545 Td
+(1. Paracetamol 500mg x 10 und ...................... $1,200.00) Tj
+50 525 Td
+(2. Ibuprofeno 400mg x 20 und ...................... $800.00) Tj
+50 505 Td
+(3. Amoxicilina 500mg x 15 und ...................... $600.00) Tj
+50 485 Td
+(4. Vitamina C 1000mg x 30 und ...................... $450.00) Tj
+/F1 12 Tf
+50 445 Td
+(Subtotal: $3,050.00) Tj
+50 425 Td
+(IVA 16%: $488.00) Tj
+/F1 14 Tf
+50 385 Td
+(Total: $3,538.00) Tj
+/F1 8 Tf
+50 335 Td
+(--- Documento generado para pruebas del sistema FarmaFlow ---) Tj
+50 315 Td
+(www.farmaflow.com) Tj
+ET
+endstream
+endobj
+
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000266 00000 n 
+0000000761 00000 n 
+
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+823
+%%EOF

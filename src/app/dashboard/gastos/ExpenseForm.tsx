@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { useSession } from 'next-auth/react'
@@ -77,6 +77,7 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<CreateExpenseInput>({
     resolver: zodResolver(createExpenseSchema),
@@ -90,6 +91,24 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
   if (myPharmacies.length === 1 && !selectedPharmacyId) {
     setSelectedPharmacyId(myPharmacies[0].pharmacyId)
   }
+
+  // Pre-fill form fields in edit mode
+  useEffect(() => {
+    if (!expense) return
+
+    setValue('amount', expense.amount)
+    setValue('description', expense.description)
+    setValue('currency', expense.currency)
+    setValue('receiptDate', new Date(expense.receiptDate).toISOString())
+
+    if (expense.pharmacy) {
+      setSelectedPharmacyId(expense.pharmacy)
+    }
+
+    if (expense.invoiceImageUrl) {
+      setPreviewUrl(expense.invoiceImageUrl)
+    }
+  }, [expense, setValue])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -167,7 +186,7 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
       let xmlUrlValue: string | undefined
       let xmlPublicId: string | undefined
 
-      // Subir imagen original via server proxy
+      // Subir imagen original via server proxy (only if new file selected)
       if (selectedFile) {
         toast.loading('Comprimiendo imagen...', { id: 'expense-load' })
         const compressedBlob = await compressImage(selectedFile, 1000, 0.6)
@@ -178,7 +197,7 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
         invoicePublicId = cloudData.publicId
       }
 
-      // Subir PDF
+      // Subir PDF (only if new file selected - task 2.2)
       if (pdfFile) {
         toast.loading('Subiendo PDF...', { id: 'expense-load' })
         const pdfData = await uploadFile(pdfFile, uploadPharmacyCode)
@@ -186,7 +205,7 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
         pdfPublicId = pdfData.publicId
       }
 
-      // Subir XML
+      // Subir XML (only if new file selected - task 2.2)
       if (xmlFile) {
         toast.loading('Subiendo XML...', { id: 'expense-load' })
         const xmlData = await uploadFile(xmlFile, uploadPharmacyCode)
@@ -194,28 +213,35 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
         xmlPublicId = xmlData.publicId
       }
 
+      // Build request based on edit mode
+      const isPatch = isEditMode
+      const url = isPatch ? `/api/expenses/${expense._id}` : '/api/expenses'
+      const method = isPatch ? 'PATCH' : 'POST'
+
       // Guardar en la API
-      toast.loading('Guardando registro...', { id: 'expense-load' })
-      const response = await fetch('/api/expenses', {
-        method: 'POST',
+      toast.loading(isPatch ? 'Actualizando registro...' : 'Guardando registro...', { id: 'expense-load' })
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...data,
-          invoiceImageUrl,
-          invoicePublicId,
-          pdfUrl: pdfUrlValue,
-          pdfPublicId,
-          xmlUrl: xmlUrlValue,
-          xmlPublicId,
+          // Only include new file URLs if new files were uploaded
+          ...(invoiceImageUrl && { invoiceImageUrl, invoicePublicId }),
+          ...(pdfUrlValue && { pdfUrl: pdfUrlValue, pdfPublicId }),
+          ...(xmlUrlValue && { xmlUrl: xmlUrlValue, xmlPublicId }),
+          // Keep existing URLs if no new files uploaded (task 2.2)
+          ...(!invoiceImageUrl && isEditMode && expense.invoiceImageUrl && { invoiceImageUrl: expense.invoiceImageUrl, invoicePublicId: expense.invoicePublicId }),
+          ...(!pdfUrlValue && isEditMode && expense.pdfUrl && { pdfUrl: expense.pdfUrl, pdfPublicId: expense.pdfPublicId }),
+          ...(!xmlUrlValue && isEditMode && expense.xmlUrl && { xmlUrl: expense.xmlUrl, xmlPublicId: expense.xmlPublicId }),
           ...(myPharmacies.length > 0 && selectedPharmacyId
             ? { pharmacyId: selectedPharmacyId }
             : {}),
         }),
       })
 
-      if (!response.ok) throw new Error('Error al guardar el gasto')
+      if (!response.ok) throw new Error(isPatch ? 'Error al actualizar el gasto' : 'Error al guardar el gasto')
 
-      toast.success('¡Gasto rendido con éxito!', { id: 'expense-load' })
+      toast.success(isPatch ? '¡Gasto actualizado con éxito!' : '¡Gasto rendido con éxito!', { id: 'expense-load' })
       router.push('/dashboard/gastos')
       router.refresh()
     } catch (error: any) {
@@ -303,6 +329,7 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
                 <label className="label">Fecha del Comprobante</label>
                 <input
                   type="date"
+                  value={watch('receiptDate')?.split('T')[0] ?? ''}
                   onChange={(e) => {
                     const date = new Date(e.target.value)
                     setValue('receiptDate', date.toISOString())
@@ -332,15 +359,15 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Comprobante (Foto/Ticket)</h3>
             <div className="relative aspect-[3/4] rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center overflow-hidden group hover:border-brand-300 transition-colors">
               {previewUrl ? (
-                <>
-                  <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <label className="cursor-pointer bg-white text-gray-900 px-4 py-2 rounded-lg text-xs font-bold shadow-xl">
-                      Cambiar Foto
-                      <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-                    </label>
-                  </div>
-                </>
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  onClick={() => window.open(previewUrl, '_blank')}
+                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') window.open(previewUrl, '_blank') }}
+                />
               ) : (
                 <label className="cursor-pointer flex flex-col items-center gap-2 p-6 text-center">
                   <div className="h-12 w-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mb-2">
@@ -352,19 +379,32 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
                 </label>
               )}
             </div>
+            {previewUrl && (
+              <label className="mt-3 flex items-center justify-center gap-2 text-sm text-brand-600 hover:text-brand-700 cursor-pointer font-medium">
+                <Camera size={16} />
+                Cambiar Foto
+                <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+              </label>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Archivo PDF (CFDI)</h3>
             {(pdfUrl || pdfFile) ? (
               <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <FileText size={20} className="text-blue-600" />
-                  <span className="text-sm text-blue-700 truncate max-w-[150px]">
-                    {pdfFile?.name || 'factura.pdf'}
-                  </span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText size={20} className="text-blue-600 shrink-0" />
+                  {pdfUrl ? (
+                    <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-700 truncate hover:text-blue-900 hover:underline" title="Abrir PDF">
+                      factura.pdf
+                    </a>
+                  ) : (
+                    <span className="text-sm text-blue-700 truncate max-w-[150px]">
+                      {pdfFile?.name}
+                    </span>
+                  )}
                 </div>
-                <button type="button" onClick={removePdf} className="p-1 hover:bg-blue-100 rounded">
+                <button type="button" onClick={removePdf} className="p-1 hover:bg-blue-100 rounded shrink-0">
                   <X size={16} className="text-blue-600" />
                 </button>
               </div>
@@ -386,13 +426,19 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Archivo XML (CFDI)</h3>
             {(xmlUrl || xmlFile) ? (
               <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <FileDigit size={20} className="text-purple-600" />
-                  <span className="text-sm text-purple-700 truncate max-w-[150px]">
-                    {xmlFile?.name || 'factura.xml'}
-                  </span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileDigit size={20} className="text-purple-600 shrink-0" />
+                  {xmlUrl ? (
+                    <a href={xmlUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-purple-700 truncate hover:text-purple-900 hover:underline" title="Abrir XML">
+                      factura.xml
+                    </a>
+                  ) : (
+                    <span className="text-sm text-purple-700 truncate max-w-[150px]">
+                      {xmlFile?.name}
+                    </span>
+                  )}
                 </div>
-                <button type="button" onClick={removeXml} className="p-1 hover:bg-purple-100 rounded">
+                <button type="button" onClick={removeXml} className="p-1 hover:bg-purple-100 rounded shrink-0">
                   <X size={16} className="text-purple-600" />
                 </button>
               </div>

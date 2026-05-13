@@ -155,27 +155,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // =============================================
-    // Phase 2: Determine initial status based on invoice presence
-    // FACTURADO: requires both pdfUrl AND xmlUrl
-    // PENDIENTE_DE_FACTURAR: no invoice OR partial invoice
-    // =============================================
-    const { pdfUrl, xmlUrl } = validation.data as {
-      pdfUrl?: string
-      xmlPublicId?: string
-      xmlUrl?: string
-    }
-
-    const hasFullInvoice = pdfUrl && xmlUrl
-    const initialStatus = hasFullInvoice
-      ? ExpenseStatus.FACTURADO
-      : ExpenseStatus.PENDIENTE_DE_FACTURAR
-
+    // Create expense - Mongoose default applies (PENDIENTE_DE_FACTURAR)
     const newExpense = await Expense.create({
       ...validation.data,
       pharmacy: finalPharmacyId,
       pharmacyName: pharmacyName,
-      status: initialStatus,
     })
 
     return NextResponse.json(newExpense, { status: 201 })
