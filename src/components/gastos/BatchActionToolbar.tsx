@@ -84,24 +84,24 @@ export function BatchActionToolbar({
   if (selectedIds.length === 0) return null
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 flex items-center gap-4 z-50">
-      <span className="text-sm font-medium text-gray-700">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100vw-2rem)] max-w-lg bg-white rounded-xl shadow-2xl border border-gray-200 p-3 md:p-4 flex items-center gap-2 md:gap-4 z-50">
+      <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
         {selectedIds.length} seleccionados
       </span>
 
       <div className="h-6 w-px bg-gray-200" />
 
-      <button
+<button
         onClick={handleBatchAction}
         disabled={isLoading}
-        className="btn-primary flex items-center gap-2"
+        className="btn-primary flex items-center gap-2 min-w-0 flex-1 md:flex-none"
       >
         {isLoading ? (
-          <Loader2 size={18} className="animate-spin" />
+          <Loader2 size={18} className="animate-spin shrink-0" />
         ) : (
           getActionIcon()
         )}
-        {getActionLabel()}
+        <span className="truncate">{getActionLabel()}</span>
       </button>
 
       <div className="h-6 w-px bg-gray-200" />

@@ -357,7 +357,7 @@ export function ExpenseForm({ expense }: ExpenseFormProps) {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Comprobante (Foto/Ticket)</h3>
-            <div className="relative aspect-[3/4] rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center overflow-hidden group hover:border-brand-300 transition-colors">
+            <div className="relative aspect-video md:aspect-[3/4] rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center overflow-hidden group hover:border-brand-300 transition-colors">
               {previewUrl ? (
                 <img
                   src={previewUrl}
