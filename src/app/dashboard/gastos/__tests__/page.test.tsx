@@ -1,36 +1,55 @@
-// Rewrite test to mock fetch() + useSession as page.tsx actually uses
+// Test the Server Component by mocking session and service layer
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import GastosPage from '../page'
-import { ExpenseStatus } from '@/types'
+import { render, screen } from '@testing-library/react'
+import { UserRole, ExpenseStatus } from '@/types'
 
-// Mock next-auth
-vi.mock('next-auth/react', () => ({
-  useSession: vi.fn(() => ({
-    data: {
-      user: {
-        id: 'user-123',
-        role: 'SUPERVISOR',
-        assignedPharmacies: ['pharm-001']
-      }
-    }
-  }))
+// Mock getServerSession
+const mockGetServerSession = vi.fn()
+vi.mock('next-auth', () => ({
+  getServerSession: mockGetServerSession,
 }))
 
-// Mock fetch globally
-const mockFetch = vi.fn()
-global.fetch = mockFetch
-
-// Mock AuditActions component
-vi.mock('@/components/audit/AuditActions', () => ({
-  AuditActions: ({ id }: { id: string }) => (
-    <div data-testid="audit-actions">Audit for {id}</div>
-  )
+vi.mock('@/lib/auth', () => ({
+  authOptions: {},
 }))
 
-// Mock BatchActionToolbar
-vi.mock('@/components/gastos/BatchActionToolbar', () => ({
-  BatchActionToolbar: () => null
+// Mock getFilteredExpenses service
+const mockGetFilteredExpenses = vi.fn()
+vi.mock('@/lib/services/expenses', () => ({
+  getFilteredExpenses: mockGetFilteredExpenses,
+}))
+
+// Mock Pharmacy model
+vi.mock('@/models/Pharmacy', () => ({
+  default: {
+    find: vi.fn(() => ({
+      select: vi.fn(() => ({
+        sort: vi.fn(() => ({
+          limit: vi.fn(() => ({
+            then: vi.fn((cb) => cb({
+              map: () => [
+                { _id: { toString: () => 'pharm-001' }, pharmacyName: 'Farmacia Centro' },
+                { _id: { toString: () => 'pharm-002' }, pharmacyName: 'Farmacia Sur' },
+              ]
+            }))
+          }))
+        }))
+      }))
+    })),
+  },
+}))
+
+// Mock GastosListClient component
+vi.mock('../GastosListClient', () => ({
+  GastosListClient: ({ initialGastos, initialPagination, userRole, pharmacies }: any) => (
+    <div data-testid="gastos-client">
+      <div data-testid="gastos-count">{initialGastos?.length || 0}</div>
+      <div data-testid="page">{initialPagination?.page}</div>
+      <div data-testid="total">{initialPagination?.total}</div>
+      <div data-testid="role">{userRole}</div>
+      <div data-testid="pharmacies-count">{pharmacies?.length || 0}</div>
+    </div>
+  ),
 }))
 
 // Sample expense data
@@ -55,292 +74,80 @@ const mockExpenses = [
     currency: 'MXN',
     status: ExpenseStatus.FACTURADO,
   },
-  {
-    _id: 'exp-3',
-    expenseNumber: 'EXP-2024-0003',
-    receiptDate: '2024-01-17T00:00:00Z',
-    pharmacyName: 'Farmacia Centro',
-    description: 'Gasto reportado',
-    amount: 500,
-    currency: 'MXN',
-    status: ExpenseStatus.REPORTED,
-  },
 ]
 
-describe('GastosPage', () => {
+describe('GastosPage (Server Component)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('should render loading state initially', async () => {
-    // Mock fetch to return loading state
-    mockFetch.mockImplementation(() => {
-      return new Promise(() => {}) // Never resolves to keep loading
+  it('should pass correct props to GastosListClient', async () => {
+    // Mock session
+    mockGetServerSession.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        role: UserRole.SUPERVISOR,
+        assignedPharmacies: ['pharm-001'],
+      },
     })
 
-    render(<GastosPage />)
-
-    // Check for loading spinner
-    await waitFor(() => {
-      expect(document.querySelector('.animate-spin')).toBeInTheDocument()
+    // Mock service response
+    mockGetFilteredExpenses.mockResolvedValue({
+      data: mockExpenses,
+      total: 2,
+      page: 1,
+      pageSize: 20,
+      totalPages: 1,
+      limit: 20,
     })
+
+    // Dynamic import to get the Server Component
+    const { default: GastosPage } = await import('../page')
+
+    // Render with empty searchParams
+    render(await GastosPage({ searchParams: Promise.resolve({}) }))
+
+    // Verify GastosListClient receives correct props
+    expect(screen.getByTestId('gastos-count')).toHaveTextContent('2')
+    expect(screen.getByTestId('page')).toHaveTextContent('1')
+    expect(screen.getByTestId('total')).toHaveTextContent('2')
+    expect(screen.getByTestId('role')).toHaveTextContent('SUPERVISOR')
   })
 
-  it('should render expense list with correct data', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: mockExpenses,
-        total: 3,
-        totalPages: 1
-      })
+  it('should pass admin role and pharmacies for admin users', async () => {
+    mockGetServerSession.mockResolvedValue({
+      user: {
+        id: 'admin-123',
+        role: UserRole.ADMIN,
+        assignedPharmacies: [],
+      },
     })
 
-    render(<GastosPage />)
-
-    // Wait for data to load - use getAllByText since both table and cards render
-    await waitFor(() => {
-      expect(screen.getAllByText('EXP-2024-0001').length).toBeGreaterThan(0)
+    mockGetFilteredExpenses.mockResolvedValue({
+      data: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+      totalPages: 0,
+      limit: 20,
     })
 
-    expect(screen.getAllByText('EXP-2024-0002').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Pago de luz').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Reparación de aire').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('MXN 1,500').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('MXN 2,500').length).toBeGreaterThan(0)
+    const { default: GastosPage } = await import('../page')
+
+    render(await GastosPage({ searchParams: Promise.resolve({}) }))
+
+    expect(screen.getByTestId('role')).toHaveTextContent('ADMIN')
+    expect(screen.getByTestId('pharmacies-count')).toHaveTextContent('2') // Mock returns 2 pharmacies
   })
 
-  it('should render status badges for expenses', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: mockExpenses,
-        total: 3,
-        totalPages: 1
-      })
-    })
+  it('should pass empty initial data when no session', async () => {
+    mockGetServerSession.mockResolvedValue(null)
 
-    render(<GastosPage />)
+    const { default: GastosPage } = await import('../page')
 
-    await waitFor(() => {
-      // Use getAllByText since both table and cards render status badges
-      expect(screen.getAllByText('Pendiente de Facturar').length).toBeGreaterThan(0)
-    })
-    expect(screen.getAllByText('Facturado').length).toBeGreaterThan(0)
-  })
-
-  it('should render pharmacy column for admin users', async () => {
-    // Mock admin session
-    vi.mock('next-auth/react', () => ({
-      useSession: vi.fn(() => ({
-        data: {
-          user: {
-            id: 'user-123',
-            role: 'ADMIN',
-            assignedPharmacies: ['pharm-001']
-          }
-        }
-      }))
-    }))
-
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: mockExpenses,
-        total: 3,
-        totalPages: 1
-      })
-    })
-
-    // Need to re-render with admin mock
-    const { rerender } = render(<GastosPage />)
-
-    await waitFor(() => {
-      // There are multiple "Farmacia Centro" (in filter dropdown and table/cards), use getAllBy
-      expect(screen.getAllByText('Farmacia Centro').length).toBeGreaterThan(0)
-    })
-    expect(screen.getAllByText('Farmacia Sur').length).toBeGreaterThan(0)
-  })
-
-  it('should render audit actions for admin users', async () => {
-    vi.mock('next-auth/react', () => ({
-      useSession: vi.fn(() => ({
-        data: {
-          user: {
-            id: 'user-123',
-            role: 'ADMIN',
-            assignedPharmacies: ['pharm-001']
-          }
-        }
-      }))
-    }))
-
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: mockExpenses,
-        total: 3,
-        totalPages: 1
-      })
-    })
-
-    const { rerender } = render(<GastosPage />)
-
-    await waitFor(() => {
-      // Both desktop table and mobile cards render audit actions
-      expect(screen.getAllByTestId('audit-actions').length).toBeGreaterThanOrEqual(3)
-    })
-  })
-
-  it('should render empty state when no expenses', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: [],
-        total: 0,
-        totalPages: 0
-      })
-    })
-
-    render(<GastosPage />)
-
-    await waitFor(() => {
-      // Both desktop and mobile empty states render
-      expect(screen.getAllByText(/No hay gastos registrados/i).length).toBeGreaterThan(0)
-    })
-  })
-
-  it('should show edit button for PENDIENTE_DE_FACTURAR status', async () => {
-    const pendingExpense = [{
-      _id: 'exp-edit-1',
-      expenseNumber: 'EXP-2024-0100',
-      receiptDate: '2024-01-15T00:00:00Z',
-      pharmacyName: 'Farmacia Centro',
-      description: 'Gasto pendiente',
-      amount: 100,
-      currency: 'MXN',
-      status: ExpenseStatus.PENDIENTE_DE_FACTURAR,
-    }]
-
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: pendingExpense,
-        total: 1,
-        totalPages: 1
-      })
-    })
-
-    render(<GastosPage />)
-
-    await waitFor(() => {
-      // Both desktop and mobile have edit buttons
-      expect(screen.getAllByRole('link', { name: /editar/i }).length).toBeGreaterThan(0)
-    })
-  })
-
-  it('should NOT show edit button for REPORTED status', async () => {
-    const reportedExpense = [{
-      _id: 'exp-edit-3',
-      expenseNumber: 'EXP-2024-0102',
-      receiptDate: '2024-01-17T00:00:00Z',
-      pharmacyName: 'Farmacia Centro',
-      description: 'Gasto reportado',
-      amount: 300,
-      currency: 'MXN',
-      status: ExpenseStatus.REPORTED,
-    }]
-
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: reportedExpense,
-        total: 1,
-        totalPages: 1
-      })
-    })
-
-    render(<GastosPage />)
-
-    await waitFor(() => {
-      expect(screen.queryByRole('link', { name: /editar/i })).not.toBeInTheDocument()
-    })
-  })
-
-  describe('Responsive behavior', () => {
-    it('should render table in desktop viewport', async () => {
-      // Mock desktop viewport
-      Object.defineProperty(window, 'innerWidth', {
-        value: 1024,
-        writable: true
-      })
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          data: mockExpenses,
-          total: 3,
-          totalPages: 1
-        })
-      })
-
-      render(<GastosPage />)
-
-      await waitFor(() => {
-        // Table should be visible (hidden md:block means visible at 1024px)
-        const table = document.querySelector('table')
-        expect(table).toBeInTheDocument()
-      })
-    })
-
-    it('should render cards in mobile viewport', async () => {
-      // Mock mobile viewport
-      Object.defineProperty(window, 'innerWidth', {
-        value: 375,
-        writable: true
-      })
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          data: mockExpenses,
-          total: 3,
-          totalPages: 1
-        })
-      })
-
-      render(<GastosPage />)
-
-      await waitFor(() => {
-        // Cards section should be visible in mobile (block md:hidden)
-        const cardSection = document.querySelector('.block.md\\:hidden.space-y-3')
-        expect(cardSection).toBeInTheDocument()
-      })
-    })
-
-    it('should show filters toggle button on mobile', async () => {
-      // Mock mobile viewport
-      Object.defineProperty(window, 'innerWidth', {
-        value: 375,
-        writable: true
-      })
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          data: [],
-          total: 0,
-          totalPages: 0
-        })
-      })
-
-      render(<GastosPage />)
-
-      await waitFor(() => {
-        // Filters toggle should be visible on mobile (md:hidden)
-        const toggleButton = screen.getByText('Filtros')
-        expect(toggleButton).toBeInTheDocument()
-      })
-    })
+    // Render - should show unauthorized message
+    const { container } = render(await GastosPage({ searchParams: Promise.resolve({}) }))
+    
+    expect(container.textContent).toContain('No autorizado')
   })
 })

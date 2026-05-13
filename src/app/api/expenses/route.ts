@@ -5,63 +5,12 @@ import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
 import { createExpenseSchema, paginationParams, expenseFilterParams } from '@/lib/validations'
 import { UserRole, ExpenseStatus } from '@/types'
-import { TTLCache } from '@/lib/ttl-cache'
-import { isAdmin } from '@/lib/roles'
-
-// TTL cache for Pharmacy queries (60 seconds)
-const pharmacyCache = new TTLCache<Array<{ _id: any }>>(60_000)
-
-/**
- * Generates a cache key for pharmacy queries
- */
-function getPharmacyCacheKey(pharmacyIds: string[]): string {
-  return [...pharmacyIds].sort().join(',')
-}
+import { getFilteredExpenses } from '@/lib/services/expenses'
 
 // =============================================
 // API Route: /api/expenses
 // Maneja la creación y listado de rendición de gastos
 // =============================================
-
-// Helper: build query filters from params
-function buildExpenseFilter(filters: {
-  status?: string
-  period?: string
-  startDate?: string
-  endDate?: string
-  pharmacyId?: string
-}) {
-  const query: any = {}
-
-  // Status filter (supports CSV: 'PENDIENTE_DE_FACTURAR,FACTURADO')
-  if (filters.status) {
-    const statuses = filters.status.split(',').map((s) => s.trim())
-    query.status = { $in: statuses }
-  }
-
-  // Period filter
-  if (filters.period) {
-    query.period = filters.period
-  }
-
-  // Date range filter
-  if (filters.startDate || filters.endDate) {
-    query.receiptDate = {}
-    if (filters.startDate) {
-      query.receiptDate.$gte = new Date(filters.startDate)
-    }
-    if (filters.endDate) {
-      query.receiptDate.$lte = new Date(filters.endDate)
-    }
-  }
-
-  // Pharmacy filter
-  if (filters.pharmacyId) {
-    query.pharmacy = filters.pharmacyId
-  }
-
-  return query
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -179,8 +128,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    await connectDB()
-
     // Parse pagination params
     const { searchParams } = new URL(req.url)
     const pagination = paginationParams.safeParse({
@@ -201,88 +148,22 @@ export async function GET(req: NextRequest) {
     })
     const filters = filterResult.success ? filterResult.data : undefined
 
-    let query: Record<string, unknown> = {}
+    // Extract session data
     const userRole = session.user.role as UserRole
     const userId = session.user.id
-    const userIsAdmin = isAdmin(userRole)
     const assignedPharmacies = session.user.assignedPharmacies || []
 
-    // Role-based pharmacy filtering (Bug #1, Bug #6)
-    if (!userIsAdmin) {
-      // Non-admin users (VENDEDOR, ENCARGADO, SUPERVISOR) - filter by assigned pharmacies
-      if (assignedPharmacies.length === 0) {
-        // No pharmacy assigned - return empty results
-        query = { pharmacy: null }
-      } else if (userRole === UserRole.SUPERVISOR) {
-        // SUPERVISOR: Can filter by specific pharmacy if it's in their assignedPharmacies
-        if (filters?.pharmacyId && assignedPharmacies.includes(filters.pharmacyId)) {
-          // pharmacyId is valid - use it
-          query.pharmacy = filters.pharmacyId
-        } else {
-          // Filter by all assigned pharmacies (ignore invalid pharmacyId)
-          // Use cache for Pharmacy lookups
-          const cacheKey = getPharmacyCacheKey(assignedPharmacies)
-          let assignedPharmaciesDocs = pharmacyCache.get(cacheKey)
-
-          if (!assignedPharmaciesDocs) {
-            const { default: Pharmacy } = await import('@/models/Pharmacy')
-            assignedPharmaciesDocs = await Pharmacy.find({
-              _id: { $in: assignedPharmacies },
-              isActive: true
-            }).select('_id') as Array<{ _id: any }>
-            pharmacyCache.set(cacheKey, assignedPharmaciesDocs)
-          }
-
-          const pharmacyIds = assignedPharmaciesDocs.map(p => p._id)
-          query.pharmacy = { $in: pharmacyIds }
-        }
-      } else {
-        // VENDEDOR/ENCARGADO: Force filter by their single pharmacy, IGNORE pharmacyId query param
-        query.pharmacy = assignedPharmacies[0]
-      }
-    }
-    // ADMIN/SUPER_ADMIN see all expenses - no pharmacy filter applied
-
-    // Apply additional filters (EXCLUDE pharmacyId for non-admin - already handled above)
-    const additionalFilters = filters ? buildExpenseFilter(filters) : {}
-    // Remove pharmacyId from additionalFilters for non-admin to prevent override
-    if (!userIsAdmin && additionalFilters.pharmacy) {
-      delete additionalFilters.pharmacy
-    }
-    query = { ...query, ...additionalFilters }
-
-    // Build sort options
-    const sortOptions: Record<string, 1 | -1> = {}
-    if (filters?.sortBy) {
-      sortOptions[filters.sortBy] = filters.sortOrder === 'asc' ? 1 : -1
-    } else {
-      sortOptions.createdAt = -1 // default
-    }
-
-    // Execute query with pagination
-    const skip = (page - 1) * pageSize
-    const [expenses, total] = await Promise.all([
-      Expense.find(query)
-        .sort(sortOptions)
-        .skip(skip)
-        .limit(pageSize)
-        .select('expenseNumber pharmacy pharmacyName amount currency category description vendor receiptDate status createdAt period pdfUrl xmlUrl'),
-      Expense.countDocuments(query),
-    ])
-
-    const totalPages = Math.ceil(total / pageSize)
-
-    return NextResponse.json({
-      data: expenses,
-      total,
+    // Delegate to shared service
+    const result = await getFilteredExpenses(
+      filters,
+      userRole,
+      userId,
+      assignedPharmacies,
       page,
-      limit: pageSize,
-      totalPages,
-      // Include filters applied for transparency
-      filters: filters && (filters.status || filters.period || filters.startDate || filters.endDate)
-        ? { status: filters.status, period: filters.period, dateRange: filters.startDate && filters.endDate ? { startDate: filters.startDate, endDate: filters.endDate } : undefined }
-        : undefined,
-    })
+      pageSize
+    )
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('API_EXPENSES_GET_ERROR:', error)
     return NextResponse.json(

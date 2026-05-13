@@ -116,6 +116,15 @@ export function isAdmin(role?: UserRole): boolean {
 }
 
 /**
+ * Alias for isAdmin() - satisfies page.tsx naming convention
+ * @param role - User role to check
+ * @returns true if user is admin (ADMIN, SUPER_ADMIN, or SUPERVISOR)
+ */
+export function isAdminUser(role?: UserRole): boolean {
+  return isAdmin(role)
+}
+
+/**
  * Verifica si un rol es Super Admin
  */
 export function isSuperAdmin(role?: UserRole): boolean {
