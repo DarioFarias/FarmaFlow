@@ -60,14 +60,22 @@ export function BatchActionToolbar({
 
     setIsLoading(true)
     try {
-      let endpoint = '/api/expenses/batch-approve'
-      if (currentAction === 'report') endpoint = '/api/expenses/batch-report'
-      if (currentAction === 'return') endpoint = '/api/expenses/batch-return'
+      const body: Record<string, unknown> = {
+        action: currentAction,
+        expenseIds: selectedIds,
+      }
 
-      const res = await fetch(endpoint, {
+      // Add period for report action
+      if (currentAction === 'report') {
+        const now = new Date()
+        const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        body.period = period
+      }
+
+      const res = await fetch('/api/expenses/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expenseIds: selectedIds }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) throw new Error('Error en operación batch')

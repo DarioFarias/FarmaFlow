@@ -248,3 +248,22 @@ export type UpdateExpenseStatusDTO = {
   status: ExpenseStatus
   adminComment?: string
 }
+
+// =============================================
+// BATCH ACTION TYPES (unified batch endpoint)
+// =============================================
+
+export type BatchAction = 'approve' | 'report' | 'return'
+
+export interface BatchResultItem {
+  id: string
+  success: boolean
+  error?: string
+}
+
+export interface BatchResult {
+  processed: number
+  failed: number
+  total: number
+  results: BatchResultItem[]
+}

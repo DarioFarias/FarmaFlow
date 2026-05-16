@@ -357,3 +357,28 @@ export const batchReportSchema = z.object({
 })
 
 export type BatchReportInput = z.infer<typeof batchReportSchema>
+
+// =============================================
+// UNIFIED BATCH ACTION SCHEMA (discriminated union)
+// =============================================
+
+export const batchActionSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('approve'),
+    expenseIds: z.array(z.string()).min(1, 'Debe incluir al menos un ID').max(50, 'Máximo 50 gastos por operación'),
+    notes: z.string().max(500).optional(),
+  }),
+  z.object({
+    action: z.literal('report'),
+    expenseIds: z.array(z.string()).min(1, 'Debe incluir al menos un ID').max(50, 'Máximo 50 gastos por operación'),
+    period: z.string().regex(/^\d{4}-\d{2}$/, 'Formato: YYYY-MM'),
+    notes: z.string().max(500).optional(),
+  }),
+  z.object({
+    action: z.literal('return'),
+    expenseIds: z.array(z.string()).min(1, 'Debe incluir al menos un ID').max(50, 'Máximo 50 gastos por operación'),
+    notes: z.string().max(500).optional(),
+  }),
+])
+
+export type BatchActionInput = z.infer<typeof batchActionSchema>

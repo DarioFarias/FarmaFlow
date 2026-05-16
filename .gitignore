@@ -37,5 +37,8 @@ Thumbs.db
 # ATL / skill-registry
 .atl/
 
+# Engram filesystem artifacts (hybrid mode fallback)
+/sdd/
+
 # Vercel
 .vercel

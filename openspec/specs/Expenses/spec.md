@@ -124,31 +124,29 @@ The custom `isModified()` function in `Expense.ts` MUST be renamed to avoid shad
 - WHEN `doc.isModified('status')` is called (Mongoose built-in)
 - THEN it returns the correct boolean without interference
 
-### Requirement: batch-approve and batch-report MUST use shared helper
+### Requirement: Operaciones batch DEBEN usar endpoint unificado
 
-Both endpoints MUST deduplicate transition logic into a shared helper for status changes. The expense schema SHALL define valid transitions in one place.
+(Todos los requisitos batch fueron reemplazados: antes usaban rutas separadas con un helper compartido)
 
-#### Scenario: Approved expense can be reported
+Los módulos de gastos DEBEN canalizar todas las operaciones batch (approve, report, return) a través de `POST /api/expenses/batch` con `{ action, expenseIds, period?, notes? }`. Las rutas antiguas (`batch-approve`, `batch-report`, `batch-return`) existen como wrappers delgados para compatibilidad. El schema de Expense DEBE definir las transiciones válidas en un solo lugar.
 
-- GIVEN an expense with status `approved`
-- WHEN batch-report is called
-- THEN the expense transitions to `reported`
+#### Scenario: Approve vía endpoint unificado
 
-#### Scenario: Duplicate transition rejected
+- DADO un gasto en estado `PENDIENTE_DE_FACTURAR` con pdfUrl y xmlUrl válidos
+- CUANDO se ejecuta la acción approve a través del endpoint unificado
+- ENTONCES el gasto transiciona a `FACTURADO`
 
-- GIVEN an expense already with status `reported`
-- WHEN batch-report is called
-- THEN the endpoint returns 400 for that expense
+#### Scenario: Report vía endpoint unificado
 
-### Requirement: batch-return naming MUST match action semantics
+- DADO un gasto en estado `FACTURADO`
+- CUANDO se ejecuta la acción report a través del endpoint unificado con `period`
+- ENTONCES el gasto transiciona a `REPORTED`
 
-The endpoint name and route SHALL clearly indicate the action. If the operation returns expenses to a previous status, the route MUST NOT use vague naming that suggests approval or reporting.
+#### Scenario: Transición duplicada rechazada
 
-#### Scenario: Naming reflects return action
-
-- GIVEN the expense API routes
-- WHEN listing expense batch operations
-- THEN each route name clearly matches its semantic action (return vs approve vs report)
+- DADO un gasto que ya está en estado `REPORTED`
+- CUANDO se ejecuta una acción batch que intenta approve ese gasto
+- ENTONCES el resultado incluye un fallo para ese gasto sin arrojar error global
 
 ### Requirement: expenseNumber hook MUST use receiptDate, not current year
 
